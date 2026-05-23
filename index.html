@@ -946,6 +946,25 @@
     display: block;
     line-height: 1.2;
   }
+  .fact-tooltip {
+    position: fixed;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 0.35rem 0.6rem;
+    font-size: var(--text-sm);
+    font-family: var(--font-body);
+    font-weight: 800;
+    color: var(--color-text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms ease;
+    z-index: 520;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  .fact-tooltip.visible { opacity: 1; }
   .graph-dot-hit { cursor: pointer; }
 
   /* Visible pre-round countdown */
@@ -1133,8 +1152,9 @@
 .pg-stage-title .pg-stage-label { font-weight: 800; }
 .pg-stage-title .pg-stage-count { color: var(--color-text-muted); font-weight: 500; }
 .sb-items { display: flex; flex-wrap: wrap; gap: 4px; }
-.sb-cell { position: relative; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 0.58rem; font-weight: 850; line-height: 1; border: 1px solid rgba(40,37,29,0.10); box-shadow: inset 0 1px 0 rgba(255,255,255,0.24); transition: transform 120ms ease; }
+.sb-cell { position: relative; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 0.58rem; font-weight: 850; line-height: 1; border: 1px solid rgba(40,37,29,0.10); box-shadow: inset 0 1px 0 rgba(255,255,255,0.24); transition: transform 120ms ease; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sb-cell:hover { transform: translateY(-1px); }
+.sb-cell:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .sb-cell.fluent, .sb-cell.review { background: var(--cell-fluent); color: var(--color-text-inverse); }
 .sb-cell.review::after { content: ''; position: absolute; right: 2px; top: 2px; width: 4px; height: 4px; border-radius: var(--radius-full); background: var(--cell-learning); border: 1px solid rgba(255,255,255,0.7); }
 .sb-cell.learning { background: var(--cell-learning); color: #28251d; }
@@ -1172,7 +1192,7 @@
       body.mobile-play-mode.round-active .pg-panel { display: none; }
     }
 </style>
-<script>
+<script type="text/javascript" nonce="2dd0ed9ef3034e9fbd08e251a93" src="//local.adguard.org?ts=1779531479304&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_0000000061d471fa91a86cb0900a2dac%26ts%3D494314%26p%3Dfs%26cid%3D1%26sig%3Da33caf9375968f3a00e71e5a802f88486ca9cf30515785e947680dfdb025aca2%26v%3D0&amp;app=zen.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1&amp;stealth=0"></script><script>
   (function(){
     var pref = 'system';
     try {
@@ -1186,7 +1206,7 @@
     document.documentElement.setAttribute('data-theme', t);
   })();
 </script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <link rel="icon" type="image/png" sizes="16x16" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAClklEQVR42n2Tz2tcZRSGn3O++935cWduJtKVCipoQQxIcWMtIkIXLnTVjrH/QETQrSBZ6KYIiptsCtm5Tcymu0KhLZIWhBottlIQoWCNlJGkapKZe7/zHRfpQtT2LF/O+66eRwBwBMEBTmy8/aILHwrymps/DiBBfnX8ijifbZ5a+/6fHcERgJdWl4rOkfufqsp7EqSfG0NcDn8VNCpuvp+zn5tN5j66vrSaAGS8Ng4Av8Clcq7zavtHg7ubOLpvU8me6RddV9GMEGLdobk/+/pJeB0g3Fq/5aPTz39ejnrvNLvTVhxVFZ1ZI0sLi5x+9g2ubm9JJqsgbtOUylHvmd1pU11Y/OqCnFg/9QIathxRUlYVlUSijgPOv7VKJ5S8f/kTNre/ZRgrzM0JmgXPZDumbrKsZYhuGVGR5InWEtmd/XSAecbdaS2RPCEgWOawI8vqKifzzFxwnaYZdTlkvlszVw4IEgiiVLHPfLdmVNa0OZE9a26yu8pJeWV97OrKX2mPdxfOsHj0TcAJEhiWFYKw1x7Q5IYggev3fmD56heICCJCAYBAduep+gnmOzX/vir2qOgB8NzoaYIGzA1BkONr43uqesQsUYYoC48dxcUZFBUfv/wBVdFn5bsvuTG5TT92+Wn3Dr9Pd7yMJWZ5Ukj2i9rTM36g1loK137bos2J+U5NYy294NyY3ObK3W8YlhVRCwqNWUoNsmcXVYKfzY21BEVEfBArhmXFMA7oFV1UhLp8kB0OOEHIjbUS/KxujjduerKVOCiDuyfL5irKZLrDte0t7vx5lx93fiaGAsvm2XOKgzJ4spXN8cbN/0UZdzPPqogUWjC1mUeNGfH/oPxwmdqM2yFEoQjIw2R6lM480JlH6Pw3haVubF/uq4UAAAAASUVORK5CYII=">
     <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,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">
@@ -1592,6 +1612,7 @@
   <div id="mobileCornerTimer" aria-live="polite" aria-label="Time remaining"></div>
   <div class="levelup-toast" id="levelupToast" aria-live="polite"></div>
   <div class="graph-tooltip" id="graphTooltip"></div>
+  <div class="fact-tooltip" id="factTooltip" aria-hidden="true"></div>
   <script>
   (function () {
     'use strict';
@@ -1939,6 +1960,7 @@ var state = {
       el.practiceQueueCount = document.getElementById('practiceQueueCount');
       el.progressGrid = document.getElementById('progressGrid');
       el.progressGraph = document.getElementById('progressGraph');
+      el.factTooltip = document.getElementById('factTooltip');
       el.streakFill = document.getElementById('streakFill');
       el.streakFlame = document.getElementById('streakFlame');
       el.fpmFill = document.getElementById('fpmFill');
@@ -7016,8 +7038,9 @@ function chooseAllStageReviewItem(previousItem, progress) {
       if (!clusterUnlocked) {
         cls = "sb-cell locked";
       }
-      html += '<span class="' + cls + '" title="' + escapeHtml(getFactAnswerLabel(item)) + '" aria-label="' + escapeHtml(getFactAnswerLabel(item)) + '">';
-      html += '</span>';
+      var factLabel = getFactAnswerLabel(item);
+      html += '<button type="button" class="' + cls + '" data-fact="' + escapeHtml(factLabel) + '" aria-label="' + escapeHtml(factLabel) + '">';
+      html += '</button>';
     }
     html += '</div></div>'; // sb-cluster
   }
@@ -7657,6 +7680,128 @@ function chooseAllStageReviewItem(previousItem, progress) {
       if (graph) graph.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
     }
 
+    function bindStageMapInteractions() {
+      var tooltip = el.factTooltip || document.getElementById('factTooltip');
+      var hideTimer = null;
+
+      if (!tooltip || tooltip.dataset.bound) return;
+      tooltip.dataset.bound = '1';
+
+      function getFactCell(target) {
+        while (target && target !== document) {
+          if (target.classList && target.classList.contains('sb-cell')) return target;
+          target = target.parentNode;
+        }
+        return null;
+      }
+
+      function getCenterPoint(node) {
+        var rect = node.getBoundingClientRect();
+        return {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+      }
+
+      function placeTooltip(clientX, clientY) {
+        var width = tooltip.offsetWidth || 120;
+        var height = tooltip.offsetHeight || 32;
+        var tx = clientX + 12;
+        var ty = clientY - height - 10;
+
+        if (tx + width + 8 > window.innerWidth) tx = clientX - width - 12;
+        if (tx < 6) tx = 6;
+        if (ty < 6) ty = clientY + 16;
+        if (ty + height + 6 > window.innerHeight) ty = Math.max(6, window.innerHeight - height - 6);
+
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top = ty + 'px';
+      }
+
+      function showFactTooltip(cell, clientX, clientY) {
+        var fact = cell.getAttribute('data-fact') || cell.getAttribute('aria-label') || '';
+        if (!fact) return;
+
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+
+        tooltip.textContent = fact;
+        tooltip.classList.add('visible');
+        tooltip.setAttribute('aria-hidden', 'false');
+        placeTooltip(clientX, clientY);
+      }
+
+      function hideFactTooltip() {
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+        tooltip.classList.remove('visible');
+        tooltip.setAttribute('aria-hidden', 'true');
+      }
+
+      function hideFactTooltipSoon(delay) {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () {
+          hideFactTooltip();
+        }, delay);
+      }
+
+      document.addEventListener('mousemove', function (e) {
+        var cell = getFactCell(e.target);
+        if (cell) {
+          showFactTooltip(cell, e.clientX, e.clientY);
+        }
+      });
+
+      document.addEventListener('mouseout', function (e) {
+        var cell = getFactCell(e.target);
+        var nextCell = getFactCell(e.relatedTarget);
+        if (cell && cell !== nextCell) hideFactTooltipSoon(80);
+      });
+
+      document.addEventListener('click', function (e) {
+        var cell = getFactCell(e.target);
+        if (cell) {
+          showFactTooltip(cell, e.clientX, e.clientY);
+          hideFactTooltipSoon(2200);
+        } else if (!getFactCell(e.target)) {
+          hideFactTooltip();
+        }
+      });
+
+      document.addEventListener('touchstart', function (e) {
+        var cell = getFactCell(e.target);
+        var touch;
+        if (cell && e.touches && e.touches.length) {
+          touch = e.touches[0];
+          showFactTooltip(cell, touch.clientX, touch.clientY);
+          hideFactTooltipSoon(2400);
+          if (e.cancelable) e.preventDefault();
+        } else {
+          hideFactTooltip();
+        }
+      }, { passive: false });
+
+      document.addEventListener('focusin', function (e) {
+        var cell = getFactCell(e.target);
+        var point;
+        if (cell) {
+          point = getCenterPoint(cell);
+          showFactTooltip(cell, point.x, point.y);
+        }
+      });
+
+      document.addEventListener('focusout', function (e) {
+        if (getFactCell(e.target)) hideFactTooltipSoon(120);
+      });
+
+      window.addEventListener('resize', hideFactTooltip);
+      window.addEventListener('scroll', hideFactTooltip, true);
+    }
+
     function bindGraphInteractions() {
       var collapseBtn = document.getElementById('graphCollapseBtn');
       var wrap = document.getElementById('progressGraphWrap');
@@ -7760,6 +7905,7 @@ function chooseAllStageReviewItem(previousItem, progress) {
       }
 
       bindEvents();
+      bindStageMapInteractions();
       bindGraphInteractions();
       renderAuthUI();
       syncState.deviceId = getDeviceId();
@@ -7793,4 +7939,3 @@ function chooseAllStageReviewItem(previousItem, progress) {
   </script>
 </body>
 </html>
-
