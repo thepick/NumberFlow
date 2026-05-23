@@ -10,7 +10,7 @@ NumberFlow gives students focused addition and subtraction practice while tracki
 
 Students sign in with Google before practicing. Progress is synced through Google Drive app data storage, so students can continue their practice across supported devices when signed in with the same Google account.
 
-NumberFlow does not require Firebase, a separate database, or a custom backend.
+NumberFlow does not require a separate database or a custom backend.
 
 ## Key features
 
@@ -18,6 +18,7 @@ NumberFlow does not require Firebase, a separate database, or a custom backend.
 - Timed addition and subtraction practice rounds, with a short get-ready countdown
 - Adaptive item selection based on accuracy, speed, confidence, and recent performance
 - Six progressive stages from anchor facts to two-digit mental math methods
+- Added within-10 +3/+4 practice and near-double subtraction inverse practice
 - Cluster-based unlocking so students see new groups only when they are ready
 - Next Up practice queue showing current items and review items
 - Stage Map showing current, locked, mastered, review, learning, and needs-practice groups
@@ -31,7 +32,7 @@ NumberFlow does not require Firebase, a separate database, or a custom backend.
 - Daily practice goal of 5 rounds
 - Light mode, dark mode, and match-device appearance options
 - Optional mobile haptic feedback on supported devices
-- Google Drive app data sync without Firebase, a database, or a custom backend
+- Google Drive app data sync without a separate database or a custom backend
 - Sync status shown in the app header
 - Sync now, sign-out, and reset-progress options
 - Confetti for sub-stage unlocks and main-stage graduation
@@ -75,16 +76,29 @@ The progress graph shows growth over time using saved quiz results. Started item
 
 ## Stages and content
 
-NumberFlow includes 291 total items across six stages.
+NumberFlow is designed to follow methods used in modern, research-backed math curricula (such as Cognitively Guided Instruction or Math Recovery) that prioritize number sense over rote memorization. Instead of grouping math facts by traditional number families (e.g., "the 1s" or "the 2s"), the app groups them sequentially by **mental math strategies**.
+
+NumberFlow includes 326 total items across six stages:
 
 | Stage | Name | Content | Items |
 |---|---|---|---:|
 | 1 | Anchor Facts | Bonds to 10, +/-0, +/-1, +/-2, subtract from 10 | 82 |
-| 2 | Counting Strategies | Count on, count back, count up | 66 |
-| 3 | Doubles and Near Doubles | Double facts and near-double neighbors | 38 |
+| 2 | Counting Strategies | Within-10 +3/+4 facts, related subtraction facts, count on, count back, count up | 83 |
+| 3 | Doubles and Near Doubles | Double facts, half facts, near-double addition, and near-double subtraction inverses | 56 |
 | 4 | Make 10 and Bridge | Make-10 addition, bridge-back subtraction | 42 |
 | 5 | Fact Families | Complements to 20, inverse thinking | 28 |
 | 6 | Two-Digit Methods | Compensation, partitioning, flexible bridging | 35 |
+
+### Progression Logic: Mixed vs. Separated Operations
+
+The flow from one level to the next is carefully structured to manage a young learner's cognitive load:
+
+- **Mixed early operations:** In early anchor clusters, addition and subtraction are mixed together when the relationship is simple and transparent, such as `+0/-0`, `+1/-1`, and `+2/-2`. This helps students see addition and subtraction as inverse operations while still practicing careful attention to the operation sign.
+- **Within-10 gap coverage:** Stage 2 now begins with missing within-10 `+3` and `+4` facts and their related subtraction facts. This gives students more practice with basic facts such as `5 + 3`, `6 + 3`, `8 - 5`, and `9 - 6` before they move into larger within-20 counting strategies.
+- **Strategy-based counting practice:** Stage 2 then extends into count-on addition, count-back subtraction, and count-up subtraction within 20. Count-up subtraction is especially useful because it encourages students to think about the distance between two numbers instead of counting backward many times.
+- **Near-double inverse practice:** Stage 3 includes doubles, half facts, near-double addition, and near-double subtraction inverses. This helps students connect facts such as `7 + 8 = 15` with related subtraction facts such as `15 - 7 = 8` and `15 - 8 = 7`.
+- **Separated advanced operations:** As strategies become more complex, such as Make 10 and Bridge in Stage 4, addition and subtraction are separated into distinct clusters. Bridging requires holding multiple steps in working memory, such as `8 + 5 -> 8 + 2 + 3 -> 13`, so the app gives students space to build the addition strategy before practicing the more demanding bridge-back subtraction strategy.
+
 
 ## Privacy and storage
 
@@ -92,7 +106,7 @@ NumberFlow requires students to sign in with Google before practicing in the cur
 
 Progress is stored for the signed-in Google user and synced through the student's Google Drive app data folder. The sync file is used for NumberFlow progress data and is not meant to appear in the student's normal Google Drive files.
 
-NumberFlow does not require Firebase, a separate database, or a custom server.
+NumberFlow does not require a separate database or a custom server.
 
 NumberFlow does not store class lists or other unnecessary classroom records in the progress data. The app uses Google sign-in to connect the practice data to the student's own Google account.
 
@@ -231,7 +245,7 @@ The speed target affects the speed bar, graph scoring, and mastery timing. It is
 
 ### The mastery score
 
-The mastery score is shown as a number out of 100. It reflects progress across all 291 items.
+The mastery score is shown as a number out of 100. It reflects progress across all 326 items.
 
 It is calculated mostly from stage and item progress:
 
