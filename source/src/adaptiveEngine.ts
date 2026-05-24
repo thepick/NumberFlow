@@ -236,10 +236,29 @@ export function getPriorityReviewQuestions(
   speedTarget: number,
   limit: number = 30
 ): MathQuestion[] {
+  const fluentMs = getFluentMs(speedTarget);
+
   return pool
     .filter((fact) => {
-      const status = getFactStatus(factStats[fact.id]);
-      return status === "needs-support" || status === "learning" || status === "near-ready";
+      const stats = factStats[fact.id];
+      if (!stats || stats.shown === 0) return false;
+
+      const recent = stats.recent.slice(-4);
+      const recentWeak = recent.filter((attempt) =>
+        !attempt.isCorrect || attempt.timeout || attempt.responseMs > fluentMs * 2.2
+      ).length;
+      const lastAttempt = recent.length > 0 ? recent[recent.length - 1] : null;
+      const status = getFactStatus(stats);
+
+      // Old lessons should come back only for true quick review, not simply
+      // because every fact is not fully mastered yet. This keeps new lessons
+      // moving while still catching recent misses, timeouts, and very slow facts.
+      return (
+        status === "needs-support" ||
+        recentWeak >= 2 ||
+        !!(lastAttempt && (!lastAttempt.isCorrect || lastAttempt.timeout)) ||
+        (stats.confidence < 50 && recentWeak >= 1)
+      );
     })
     .sort((a, b) => getFactWeight(b, factStats[b.id], speedTarget) - getFactWeight(a, factStats[a.id], speedTarget))
     .slice(0, limit);

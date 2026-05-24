@@ -355,7 +355,6 @@ export default function App() {
   const [stars, setStars] = useState<number>(0);
   const [studentName, setStudentName] = useState<string>("Elite Math Explorer");
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
-  const [showDebugDetails, setShowDebugDetails] = useState<boolean>(false);
 
   // Settings
   const [speedTarget, setSpeedTarget] = useState<number>(20);
@@ -510,12 +509,31 @@ export default function App() {
     const previousFacts = mergeUniqueQuestions(
       ...earlierStrategies.map((item) => generateQuestionPoolForStrategy(item.code))
     );
-    const reviewLimit = Math.max(15, Math.round(currentFacts.length * 0.35));
+    const reviewLimit = Math.max(2, Math.min(8, Math.round(currentFacts.length * 0.12)));
     const priorityReview = getPriorityReviewQuestions(previousFacts, factStatsRef.current, speedTarget, reviewLimit);
     return {
       currentFacts,
       practicePool: mergeUniqueQuestions(currentFacts, priorityReview),
     };
+  };
+
+  const getReviewFactsForActiveRound = () => {
+    const currentFactIds = new Set(currentStrategyFactsRef.current.map((fact) => fact.id));
+    return questionPoolRef.current.filter((fact) => !currentFactIds.has(fact.id));
+  };
+
+  const chooseNextRoundFact = (statsSnapshot: FactStatsMap, previousId?: string): MathQuestion | null => {
+    const currentPool = currentStrategyFactsRef.current.length > 0
+      ? currentStrategyFactsRef.current
+      : questionPoolRef.current;
+    const reviewPool = getReviewFactsForActiveRound();
+    const shouldUseQuickReview = reviewPool.length > 0 && roundAttemptsRef.current > 0 && roundAttemptsRef.current % 6 === 0;
+    const preferredPool = shouldUseQuickReview ? reviewPool : currentPool;
+
+    return (
+      chooseNextFact(preferredPool, statsSnapshot, speedTarget, previousId) ||
+      chooseNextFact(questionPoolRef.current, statsSnapshot, speedTarget, previousId)
+    );
   };
 
   const activateQuestion = (question: MathQuestion | null) => {
@@ -559,7 +577,7 @@ export default function App() {
 
   const advanceToNextQuestion = (statsSnapshot: FactStatsMap = factStatsRef.current) => {
     const previousId = currentQuestionRef.current?.id;
-    const nextQuestion = chooseNextFact(questionPoolRef.current, statsSnapshot, speedTarget, previousId);
+    const nextQuestion = chooseNextRoundFact(statsSnapshot, previousId);
     activateQuestion(nextQuestion);
     setCurrentQuestionIdx((prev) => prev + 1);
   };
@@ -653,7 +671,7 @@ export default function App() {
     setCurrentStrategyFacts(currentFacts);
     setRoundQuestions(practicePool);
 
-    const firstQuestion = chooseNextFact(practicePool, factStatsRef.current, speedTarget);
+    const firstQuestion = chooseNextFact(currentFacts, factStatsRef.current, speedTarget);
     activateQuestion(firstQuestion);
 
     setCurrentQuestionIdx(0);
@@ -856,15 +874,6 @@ export default function App() {
     document.body.classList.add("timed-quiz-active");
     document.documentElement.classList.add("timed-quiz-active");
 
-    const alignQuizView = () => {
-      const quizCard = document.querySelector(".timed-quiz-card") as HTMLElement | null;
-      if (quizCard && typeof quizCard.scrollIntoView === "function") {
-        quizCard.scrollIntoView({ block: "start", inline: "nearest" });
-      } else {
-        window.scrollTo(0, 0);
-      }
-    };
-
     const blurFocusedInput = () => {
       const activeElement = document.activeElement as HTMLElement | null;
       if (activeElement && typeof activeElement.blur === "function") {
@@ -873,14 +882,11 @@ export default function App() {
       inputRef.current?.blur();
     };
 
-    alignQuizView();
-    window.requestAnimationFrame(alignQuizView);
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     blurFocusedInput();
-    const alignTimer = window.setTimeout(alignQuizView, 140);
     const blurTimer = window.setTimeout(blurFocusedInput, 75);
 
     return () => {
-      window.clearTimeout(alignTimer);
       window.clearTimeout(blurTimer);
       document.body.classList.remove("timed-quiz-active");
       document.documentElement.classList.remove("timed-quiz-active");
@@ -967,6 +973,8 @@ export default function App() {
   const activeStrategies = STRATEGIES.filter(s => s.stageId === currentStageId);
   const practiceStatusSummary = getPracticeStatusSummary(currentStrategyFacts, factStats);
   const currentQuestionStatus = currentQuestion ? getFactStatus(factStats[currentQuestion.id]) : "empty";
+  const currentLessonFactIds = new Set(currentStrategyFacts.map((fact) => fact.id));
+  const isQuickReviewFact = !!currentQuestion && currentLessonFactIds.size > 0 && !currentLessonFactIds.has(currentQuestion.id);
   const roundAccuracyPercent = roundAttempts > 0 ? Math.round((roundCorrectAttempts / roundAttempts) * 100) : 100;
   const bronzeMilestoneForMastery = Math.max(3, Math.round(speedTarget * 0.3));
   const currentMasterySummary = getStrategyAdaptiveMastery(
@@ -1650,11 +1658,11 @@ export default function App() {
                 className="text-xs text-blue-800 hover:text-blue-900 flex items-center gap-1.5 bg-white border-2 border-blue-200 px-3 py-1.5 rounded-xl font-black transition active:translate-y-0.5 cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Return to World Map
+                Map
               </button>
 
               <span className="text-xs bg-white border-2 border-blue-200 px-3 py-1.5 rounded-xl text-blue-900 font-black">
-                Practicing Strategy {activeStrategyRound.id}/{STRATEGIES.length}
+                Lesson {activeStrategyRound.id}/{STRATEGIES.length}
               </span>
             </div>
             )}
@@ -1703,13 +1711,13 @@ export default function App() {
                     <div className="text-center py-6 space-y-6">
                       <div className="space-y-2">
                         <span className="inline-block bg-blue-105 border-2 border-blue-200 text-blue-700 text-xs font-black px-3.5 py-1.5 rounded-full">
-                          💡 Strategy Match
+                          1-Minute Sprint
                         </span>
                         <h3 className="text-2xl md:text-3xl font-display font-black text-blue-950">
                           {activeStrategyRound.name}
                         </h3>
                         <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-                          Your goal is to answer as many questions correctly as you can within 1 minute! Keep your speed targets in mind:
+                          Answer as many as you can in 1 minute.
                         </p>
                       </div>
 
@@ -1738,7 +1746,7 @@ export default function App() {
                           </div>
                         </div>
                         <p className="text-[10px] text-blue-800 font-extrabold">
-                          * Passing sprint: {roundPassTarget} correct with at least 80% accuracy. Gold is the challenge goal.
+                          Pass: {roundPassTarget}+ correct and 80% correct.
                         </p>
                       </div>
 
@@ -1748,7 +1756,7 @@ export default function App() {
                         className="mx-auto bg-white hover:bg-slate-50 border-2 border-slate-200 text-xs text-slate-700 font-black py-3 px-6 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:translate-y-0.5"
                       >
                         <BookOpen className="w-4 h-4 text-[#FF4757]" />
-                        Review Strategy Lesson Slide (Full)
+                        Review lesson
                       </button>
 
                       {/* Huge Start Button */}
@@ -1756,69 +1764,37 @@ export default function App() {
                         onClick={startTimedRoundCountdown}
                         className="w-full max-w-[340px] mx-auto block bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-lg transition border-2 border-emerald-600 shadow-[0_5px_0px_#047857] active:scale-98 active:translate-y-0.5 cursor-pointer active:shadow-none"
                       >
-                        Start 1-Minute Sprint! ⏱️
+                        Start Sprint
                       </button>
                     </div>
                   ) : (
                     // Timed Active Sprint Playing Layout
-                    <div className="timed-sprint-layout space-y-5">
+                    <div className="timed-sprint-layout">
                       
-                      {/* Quiet digital indicators (Time & Score) */}
-                      <div className="flex justify-between items-center bg-slate-50/80 px-4 py-2.5 rounded-2xl border border-slate-100">
-                        <div className="flex items-center gap-1.5 text-slate-600 text-sm font-black">
-                          <Clock className={`w-4 h-4 text-[#FF4757] stroke-[3.5] ${timeLeft <= 15 ? "animate-pulse" : ""}`} />
-                          <span className={`${timeLeft <= 15 ? "text-red-650 font-black" : "text-slate-700"}`}>
-                            Time Left: <span className="font-mono text-base">{timeLeft}s</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-600 text-sm font-black">
-                          <Trophy className="w-4 h-4 text-amber-500 stroke-[3.5]" />
-                          <span>
-                            Solved: <span className="font-mono text-base text-blue-950 font-black">{roundScore} facts</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 1. STREAK STATS PROGRESS BAR */}
-                      <div className="p-3 bg-slate-50/60 rounded-2xl border border-slate-100 space-y-1">
-                        <div className="flex justify-between text-[11px] font-black uppercase text-slate-500">
-                          <span className="flex items-center gap-1">
-                            🔥 Streak: <strong className="text-orange-600 font-extrabold">{currentStreak} in a row</strong>
-                          </span>
-                          <span>
-                            Round Best: <strong>{bestStreakRound}</strong> | Ever: <strong>{bestStreaks[activeStrategyRound.id] || 0}</strong>
-                          </span>
-                        </div>
-                        {/* Progress Bar Container */}
-                        <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden shadow-inner">
-                          <div 
-                            className="bg-sky-500 h-full rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(100, (currentStreak / Math.max(10, speedTarget)) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* 2. SPEED STATS VELOCITY BAR */}
                       {(() => {
                         const elapsed = 60 - timeLeft;
                         const realtimeSpeed = elapsed > 0 ? (roundScore / elapsed) * 60 : 0;
-                        const bestSpEver = bestSpeeds[activeStrategyRound.id] || 0;
                         return (
-                          <div className="p-3 bg-slate-50/60 rounded-2xl border border-slate-100 space-y-1">
-                            <div className="flex justify-between text-[11px] font-black uppercase text-slate-500">
-                              <span className="flex items-center gap-1">
-                                🏃‍♂️ Speed: <strong className="text-blue-900 font-extrabold">{realtimeSpeed.toFixed(1)}/min</strong>
-                              </span>
-                              <span>
-                                Best speed ever: <strong>{bestSpEver.toFixed(1)}/min</strong>
-                              </span>
+                          <div className="timed-stats-grid grid grid-cols-4 gap-2 bg-slate-50/80 px-3 py-2 rounded-2xl border border-slate-100 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <Clock className={`w-4 h-4 text-[#FF4757] stroke-[3.5] ${timeLeft <= 15 ? "animate-pulse" : ""}`} />
+                              <span className={`font-mono text-base font-black ${timeLeft <= 15 ? "text-red-650" : "text-blue-950"}`}>{timeLeft}s</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500">Time</span>
                             </div>
-                            {/* Multicolored Gradient Velocity Progress Track */}
-                            <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden shadow-inner relative">
-                              <div 
-                                className="bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 h-full rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, (realtimeSpeed / Math.max(15, speedTarget)) * 100)}%` }}
-                              />
+                            <div className="flex flex-col items-center justify-center">
+                              <Trophy className="w-4 h-4 text-amber-500 stroke-[3.5]" />
+                              <span className="font-mono text-base font-black text-blue-950">{roundScore}</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500">Solved</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-base leading-none">🔥</span>
+                              <span className="font-mono text-base font-black text-orange-600">{currentStreak}</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500">Streak</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-base leading-none">🏃</span>
+                              <span className="font-mono text-base font-black text-blue-950">{realtimeSpeed.toFixed(0)}</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500">/min</span>
                             </div>
                           </div>
                         );
@@ -1829,7 +1805,7 @@ export default function App() {
                         onClick={() => inputRef.current?.blur()}
                         animate={isShaking ? { x: [-10, 10, -10, 10, -5, 5, 0] } : {}}
                         transition={{ duration: 0.3 }}
-                        className={`text-center py-6 md:py-8 rounded-3xl border-4 transition-all duration-200 relative overflow-hidden select-none cursor-pointer ${
+                        className={`timed-question-card text-center py-6 md:py-8 rounded-3xl border-4 transition-all duration-200 relative overflow-hidden select-none cursor-pointer ${
                           isAnimatingCorrect 
                             ? "border-emerald-500 bg-emerald-50/10" 
                             : isShaking 
@@ -1837,8 +1813,8 @@ export default function App() {
                             : "bg-slate-50/50 border-slate-200 hover:border-slate-350"
                         }`}
                       >
-                        <span className="text-[10px] font-mono uppercase bg-white border border-slate-250 text-slate-500 font-black px-2.5 py-0.5 rounded-full inline-block mb-2">
-                          {activeStrategyRound.name}
+                        <span className={`text-[10px] font-mono uppercase bg-white border font-black px-2.5 py-0.5 rounded-full inline-block mb-2 ${isQuickReviewFact ? "border-amber-200 text-amber-700" : "border-slate-250 text-slate-500"}`}>
+                          {isQuickReviewFact ? "Quick Review" : activeStrategyRound.name}
                         </span>
 
                         {/* Centered Question Formula */}
@@ -1887,7 +1863,7 @@ export default function App() {
                       </motion.div>
 
                       {/* Interactive Spam Warning */}
-                      {spamWarning && (
+                      {spamWarning && !isTimedQuizInProgress && (
                         <motion.div 
                           initial={{ opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -1955,7 +1931,7 @@ export default function App() {
                           className="flex-1 bg-white hover:bg-slate-50 border-2 border-slate-200 text-[11px] text-slate-700 font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:translate-y-0.5"
                         >
                           <HelpCircle className="w-3.5 h-3.5 text-yellow-500" />
-                          {showHint ? "Hide Formula Strategy" : "Strategy Hint"}
+                          {showHint ? "Hide hint" : "Hint"}
                         </button>
 
                         <button
@@ -1963,7 +1939,7 @@ export default function App() {
                           className="flex-1 bg-white hover:bg-slate-50 border-2 border-slate-200 text-[11px] text-slate-700 font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer active:translate-y-0.5"
                         >
                           <BookOpen className="w-3.5 h-3.5 text-red-500" />
-                          Revisit Lesson Slide (Full)
+                          Review lesson
                         </button>
                       </div>
                       )}
@@ -2018,29 +1994,29 @@ export default function App() {
 
                   <div className="space-y-2">
                     <h3 className="text-2xl md:text-3xl font-display font-black text-blue-950">
-                      1-Minute Sprint Complete! ⏱️
+                      Sprint Complete! ⏱️
                     </h3>
                     <p className="text-sm text-slate-650 font-extrabold max-w-sm mx-auto leading-relaxed">
-                      Nice work! You finished a 1-minute sprint for <strong className="text-blue-600 font-black">{activeStrategyRound.name}</strong>. Check your speed and accuracy below.
+                      Nice work on <strong className="text-blue-600 font-black">{activeStrategyRound.name}</strong>.
                     </p>
                   </div>
 
                   {/* score badge summary */}
                   <div className="bg-yellow-50 p-6 rounded-[32px] border-4 border-yellow-300 inline-block shadow-[0_4px_0px_0px_#FDE047]">
-                    <span className="text-xs text-[#FF4757] uppercase tracking-widest block mb-1 font-black font-semibold">Speed Score</span>
+                    <span className="text-xs text-[#FF4757] uppercase tracking-widest block mb-1 font-black font-semibold">Result</span>
                     <span className="text-4xl font-mono font-black text-blue-950">{roundScore} correct in 1 min</span>
-                    <span className="block text-xs text-slate-500 font-black mt-1">{roundAccuracyPercent}% accuracy</span>
+                    <span className="block text-xs text-slate-500 font-black mt-1">{roundAccuracyPercent}% correct</span>
                     
                     <div className="mt-4 pt-3 border-t border-yellow-250 text-xs text-blue-950 font-black space-y-1">
                       {roundScore >= speedTarget ? (
-                        <p className="text-amber-600 font-black text-sm">🏆 Gold speed reached! You earned 3 gold stars! 🏆</p>
+                        <p className="text-amber-600 font-black text-sm">🏆 Gold! 3 stars earned! 🏆</p>
                       ) : roundScore >= Math.max(6, Math.round(speedTarget * 0.6)) ? (
-                        <p className="text-slate-700 font-black text-sm">🥈 Silver speed reached! You earned 2 stars! 🥈</p>
+                        <p className="text-slate-700 font-black text-sm">🥈 Silver! 2 stars earned! 🥈</p>
                       ) : roundScore >= Math.max(3, Math.round(speedTarget * 0.3)) ? (
-                        <p className="text-amber-800 font-semibold">🥉 Bronze speed reached! You earned 1 star! 🥉</p>
+                        <p className="text-amber-800 font-semibold">🥉 Bronze! 1 star earned! 🥉</p>
                       ) : (
                         <p className="text-slate-500 font-bold max-w-xs mx-auto leading-snug">
-                          🌿 Great effort! Practice again to answer at least {roundPassTarget} correct facts with 80% accuracy to unlock the next stop.
+                          🌿 Try again for {roundPassTarget}+ correct and 80% correct.
                         </p>
                       )}
                     </div>
@@ -2052,11 +2028,11 @@ export default function App() {
                     </span>
                     {activeStrategyPassed ? (
                       <p className="text-sm text-emerald-800 font-black leading-relaxed">
-                        Great sprint! You passed this stop. Continue to the next lesson, or try again to beat your speed.
+                        You passed this stop. Keep going!
                       </p>
                     ) : (
                       <p className="text-sm text-slate-700 font-bold leading-relaxed">
-                        To unlock the next stop, aim for at least {roundPassTarget} correct answers in 1 minute with 80% accuracy.
+                        Goal: {roundPassTarget}+ correct and 80% correct.
                       </p>
                     )}
                   </div>
@@ -2070,7 +2046,7 @@ export default function App() {
                       }}
                       className="bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 font-black py-3 px-6 rounded-xl text-xs sm:text-sm transition cursor-pointer active:translate-y-0.5"
                     >
-                      Return to Map
+                      Map
                     </button>
 
                     <button
@@ -2088,7 +2064,7 @@ export default function App() {
                         }}
                         className="bg-[#FF4757] hover:bg-[#FF6B81] text-white font-black py-3 px-6 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-1.5 border-2 border-[#D63031] shadow-[0_4px_0px_0px_#D63031] active:translate-y-0.5 cursor-pointer"
                       >
-                        Continue to Next Lesson
+                        Next Lesson
                         <ChevronRight className="w-4 h-4 stroke-[3]" />
                       </button>
                     )}
@@ -2102,20 +2078,6 @@ export default function App() {
         )}
 
       </main>
-
-      {/* FOOTER METADATA */}
-      {!isTimedQuizInProgress && (
-      <footer className="border-t-2 border-blue-100 bg-blue-50/40 mt-12 py-6 px-4 text-center">
-        <div className="max-w-6xl mx-auto space-y-2">
-          <p className="text-xs text-blue-800 font-bold leading-snug">
-            Designed for elementary students to strengthen core mental calculation anchors, such as doubling, 10-frameworks, and partitioning methods.
-          </p>
-          <p className="text-[10px] text-blue-500 font-mono font-black">
-            Full {STRATEGIES.length} Strategic Deck Course Framework • Local Storage Persistence Enabled
-          </p>
-        </div>
-      </footer>
-      )}
 
       {/* STRATEGY BREAK MODAL OVERLAY */}
       <AnimatePresence>
@@ -2255,16 +2217,16 @@ export default function App() {
               <div className="space-y-4 text-left text-slate-900">
                 <div className="flex items-center gap-2">
                   <span className="inline-block bg-blue-50 text-blue-700 font-mono font-black tracking-wider text-[11px] uppercase border-2 border-blue-100 px-3 py-1 rounded-full">
-                    ⚙️ Settings & Configuration
+                    ⚙️ Settings
                   </span>
                 </div>
 
                 <div className="space-y-1">
                   <h3 className="text-xl font-display font-black text-blue-950 tracking-tight leading-snug">
-                    Journey Command Centre
+                    Settings
                   </h3>
                   <p className="text-xs text-slate-500 font-bold">
-                    Adjust speed difficulty and manage local storage files.
+                    Choose the sprint speed.
                   </p>
                 </div>
 
@@ -2273,7 +2235,7 @@ export default function App() {
                 {/* 1. Goal Speed Settings */}
                 <div className="space-y-2">
                   <label className="text-xs font-mono uppercase tracking-widest text-[#FF4757] font-black block">
-                    ⚡ Calculation Target Pace:
+                    ⚡ Sprint Speed
                   </label>
                   <div className="bg-blue-50/50 p-4 rounded-xl border-2 border-blue-100">
                     <select
@@ -2292,97 +2254,79 @@ export default function App() {
                       <option value={40}>40 items/min (Grandmaster)</option>
                     </select>
                     <p className="text-[10px] text-gray-500 font-bold mt-2 leading-relaxed">
-                      This determines the countdown speed you must beat to earn 3-star Master status. Higher targets require quicker muscle memory.
+                      Gold means reaching this many correct answers in 1 minute.
                     </p>
                   </div>
                 </div>
 
                 <div className="border-t-2 border-slate-100 my-1" />
 
-                {/* 2. Teacher/debug learning data */}
-                <div className="space-y-2">
-                  <span className="text-xs font-mono uppercase tracking-widest text-slate-400 font-black block">
-                    Teacher Debug Area:
-                  </span>
-                  <div className="bg-slate-50/70 p-4 rounded-xl border-2 border-slate-100 space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowDebugDetails(!showDebugDetails)}
-                      className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-blue-900 font-black rounded-lg text-xs border-2 border-slate-200 transition active:translate-y-0.5 cursor-pointer text-center"
-                    >
-                      {showDebugDetails ? "Hide learning data" : "Show learning data"}
-                    </button>
+                <details className="bg-slate-50/60 border-2 border-slate-100 rounded-xl p-3 text-left">
+                  <summary className="text-[11px] font-black text-slate-500 uppercase tracking-widest cursor-pointer select-none">
+                    Teacher tools
+                  </summary>
 
-                    {showDebugDetails && (
-                      <div className="space-y-3 text-[10px] text-slate-600 font-bold leading-relaxed">
-                        <p>
-                          This area is for checking the practice engine. It stays hidden during student sprints so the quiz screen can focus on time, score, streak, the question, and the keypad.
-                        </p>
+                  <div className="mt-4 space-y-4">
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-3">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                        Learning data
+                      </span>
 
-                        <div className="grid grid-cols-2 gap-2 text-center font-black">
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-blue-900 text-sm">{activeStrategyRound ? activeStrategyRound.name : "None"}</span>
-                            <span className="text-slate-500">Current lesson</span>
-                          </div>
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-blue-900 text-sm">{getLearnerStatusLabel(currentQuestionStatus)}</span>
-                            <span className="text-slate-500">Current fact support</span>
-                          </div>
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-blue-900 text-sm">{roundAccuracyPercent}%</span>
-                            <span className="text-slate-500">Sprint correct rate</span>
-                          </div>
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-blue-900 text-sm">{roundQuestions.length || currentStrategyFacts.length}</span>
-                            <span className="text-slate-500">Questions available</span>
-                          </div>
+                      <div className="grid grid-cols-2 gap-2 text-center text-[10px] font-black">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-blue-900 text-sm">{activeStrategyRound ? activeStrategyRound.name : "None"}</span>
+                          <span className="text-slate-500">Current lesson</span>
                         </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-black">
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-slate-700 text-sm">{practiceStatusSummary.needsPractice}</span>
-                            <span className="text-slate-500">Extra practice</span>
-                          </div>
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-slate-700 text-sm">{practiceStatusSummary.almostThere}</span>
-                            <span className="text-slate-500">Almost ready</span>
-                          </div>
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-slate-700 text-sm">{practiceStatusSummary.reviewSoon}</span>
-                            <span className="text-slate-500">Review soon</span>
-                          </div>
-                          <div className="bg-white border border-slate-200 rounded-xl p-2">
-                            <span className="block text-slate-700 text-sm">{practiceStatusSummary.fluent}</span>
-                            <span className="text-slate-500">Ready</span>
-                          </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-blue-900 text-sm">{getLearnerStatusLabel(currentQuestionStatus)}</span>
+                          <span className="text-slate-500">Fact support</span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-blue-900 text-sm">{roundAccuracyPercent}%</span>
+                          <span className="text-slate-500">Correct rate</span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-blue-900 text-sm">{roundQuestions.length || currentStrategyFacts.length}</span>
+                          <span className="text-slate-500">Pool size</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="border-t-2 border-slate-100 my-1" />
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px] font-black">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-slate-700 text-sm">{practiceStatusSummary.needsPractice}</span>
+                          <span className="text-slate-500">Extra help</span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-slate-700 text-sm">{practiceStatusSummary.almostThere}</span>
+                          <span className="text-slate-500">Close</span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-slate-700 text-sm">{practiceStatusSummary.reviewSoon}</span>
+                          <span className="text-slate-500">Review</span>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                          <span className="block text-slate-700 text-sm">{practiceStatusSummary.fluent}</span>
+                          <span className="text-slate-500">Ready</span>
+                        </div>
+                      </div>
+                    </div>
 
-                {/* 3. Reset Progress Button */}
-                <div className="space-y-2">
-                  <span className="text-xs font-mono uppercase tracking-widest text-slate-400 font-black block">
-                    ⚠️ Danger Zone:
-                  </span>
-                  <div className="bg-red-50/50 p-4 rounded-xl border-2 border-red-100 flex flex-col gap-2">
-                    <p className="text-[10px] text-red-700 font-extrabold leading-snug">
-                      Warning: Resetting deletes all active adventure stars, completed levels, highscore records, and locks all stages except Starter Island.
-                    </p>
-                    <button 
-                      onClick={() => {
-                        handleResetProgress();
-                        setShowSettingsModal(false);
-                      }}
-                      className="w-full py-2.5 px-4 bg-red-100 hover:bg-red-200 text-red-700 font-black rounded-lg text-xs border-2 border-red-300 transition active:translate-y-0.5 cursor-pointer text-center animate-pulse"
-                    >
-                      Reset Entire Journey Progress
-                    </button>
+                    <div className="bg-red-50/50 p-3 rounded-xl border-2 border-red-100 space-y-2">
+                      <span className="text-[10px] font-black text-red-700 uppercase tracking-widest block">
+                        Reset
+                      </span>
+                      <button 
+                        onClick={() => {
+                          handleResetProgress();
+                          setShowSettingsModal(false);
+                        }}
+                        className="w-full py-2.5 px-4 bg-red-100 hover:bg-red-200 text-red-700 font-black rounded-lg text-xs border-2 border-red-300 transition active:translate-y-0.5 cursor-pointer text-center"
+                      >
+                        Reset Progress
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </details>
               </div>
             </motion.div>
           </div>
