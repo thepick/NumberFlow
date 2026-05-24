@@ -99,7 +99,7 @@ export const STAGES: Stage[] = [
 ];
 
 export const STRATEGIES: Strategy[] = [
-  // Chapter 1: Starter Island, lessons 1-6
+  // Chapter 1: Starter Island, lessons 1-5
   {
     id: 1,
     stageId: StageId.StarterIsland,
@@ -166,24 +166,10 @@ export const STRATEGIES: Strategy[] = [
       "That partner is the answer."
     ]
   },
+
+  // Chapter 2: Counting Trail, lessons 6-8
   {
     id: 6,
-    stageId: StageId.StarterIsland,
-    code: "chapter-1-practice",
-    name: "Starter Island Practice",
-    reason: "You reached the chapter practice!",
-    explanation: "Practice the anchor facts from Chapter 1.",
-    example: "0 facts, +/-1, +/-2, and make-10 facts",
-    thinkSteps: [
-      "Check the operation sign.",
-      "Use the lesson strategy that fits the fact.",
-      "Keep a steady pace."
-    ]
-  },
-
-  // Chapter 2: Counting Trail, lessons 7-11
-  {
-    id: 7,
     stageId: StageId.CountingTrail,
     code: "count-on",
     name: "Count On to Add",
@@ -196,7 +182,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 8,
+    id: 7,
     stageId: StageId.CountingTrail,
     code: "count-back",
     name: "Count Back to Subtract",
@@ -209,7 +195,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 9,
+    id: 8,
     stageId: StageId.CountingTrail,
     code: "count-up",
     name: "Count Up to Subtract",
@@ -222,38 +208,10 @@ export const STRATEGIES: Strategy[] = [
       "The number of jumps is the answer."
     ]
   },
-  {
-    id: 10,
-    stageId: StageId.CountingTrail,
-    code: "chapter-2-practice",
-    name: "Counting Trail Practice",
-    reason: "You reached the chapter practice!",
-    explanation: "Practice counting strategies within 20.",
-    example: "Count on, count back, and count up facts",
-    thinkSteps: [
-      "Choose the fastest counting strategy.",
-      "Use small jumps.",
-      "Keep your eyes on the sign."
-    ]
-  },
-  {
-    id: 11,
-    stageId: StageId.CountingTrail,
-    code: "review-1-2",
-    name: "Review: Chapters 1-2",
-    reason: "You unlocked a review lesson!",
-    explanation: "Mix the anchor facts and counting facts you have learned so far.",
-    example: "A mix of Chapter 1 and Chapter 2 facts",
-    thinkSteps: [
-      "Use anchor facts when they fit.",
-      "Use counting strategies for small jumps.",
-      "Do not rush the sign."
-    ]
-  },
 
-  // Chapter 3: Doubles Forest, lessons 12-17
+  // Chapter 3: Doubles Forest, lessons 9-12
   {
-    id: 12,
+    id: 9,
     stageId: StageId.DoublesForest,
     code: "doubles",
     name: "Doubles",
@@ -266,7 +224,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 13,
+    id: 10,
     stageId: StageId.DoublesForest,
     code: "half-facts",
     name: "Half Facts",
@@ -279,7 +237,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 14,
+    id: 11,
     stageId: StageId.DoublesForest,
     code: "near-double-one",
     name: "Near Doubles: One Apart",
@@ -292,7 +250,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 15,
+    id: 12,
     stageId: StageId.DoublesForest,
     code: "near-double-two",
     name: "Near Doubles: Two Apart",
@@ -304,38 +262,10 @@ export const STRATEGIES: Strategy[] = [
       "Add 2 more."
     ]
   },
-  {
-    id: 16,
-    stageId: StageId.DoublesForest,
-    code: "chapter-3-practice",
-    name: "Doubles Forest Practice",
-    reason: "You reached the chapter practice!",
-    explanation: "Practice doubles, halves, and near doubles.",
-    example: "6 + 6, 12 - 6, 6 + 7",
-    thinkSteps: [
-      "Look for twin numbers.",
-      "Use a double when numbers are close.",
-      "For subtraction, think of the related addition fact."
-    ]
-  },
-  {
-    id: 17,
-    stageId: StageId.DoublesForest,
-    code: "review-1-3",
-    name: "Review: Chapters 1-3",
-    reason: "You unlocked a review lesson!",
-    explanation: "Mix anchor facts, counting facts, and doubles facts.",
-    example: "A mix of Chapters 1, 2, and 3",
-    thinkSteps: [
-      "Choose the strategy that fits.",
-      "Use doubles when numbers are close.",
-      "Keep a steady pace."
-    ]
-  },
 
-  // Chapter 4: Bridge Town, lessons 18-22
+  // Chapter 4: Bridge Town, lessons 13-15
   {
-    id: 18,
+    id: 13,
     stageId: StageId.BridgeTown,
     code: "make-10-add",
     name: "Make 10 to Add",
@@ -349,7 +279,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 19,
+    id: 14,
     stageId: StageId.BridgeTown,
     code: "bridge-back",
     name: "Bridge Back to Subtract",
@@ -363,7 +293,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 20,
+    id: 15,
     stageId: StageId.BridgeTown,
     code: "missing-part-10",
     name: "Missing Part to 10",
@@ -375,38 +305,10 @@ export const STRATEGIES: Strategy[] = [
       "The missing partner is 3."
     ]
   },
-  {
-    id: 21,
-    stageId: StageId.BridgeTown,
-    code: "chapter-4-practice",
-    name: "Bridge Town Practice",
-    reason: "You reached the chapter practice!",
-    explanation: "Practice adding and subtracting across 10.",
-    example: "8 + 5, 14 - 6, 7 + ? = 10",
-    thinkSteps: [
-      "Bridge through 10.",
-      "Split the number into friendly parts.",
-      "Finish from 10."
-    ]
-  },
-  {
-    id: 22,
-    stageId: StageId.BridgeTown,
-    code: "review-1-4",
-    name: "Review: Chapters 1-4",
-    reason: "You unlocked a review lesson!",
-    explanation: "Mix everything from anchors through bridging.",
-    example: "A mix of Chapters 1, 2, 3, and 4",
-    thinkSteps: [
-      "Use make-10 when crossing 10.",
-      "Use doubles when numbers are close.",
-      "Use counting for small jumps."
-    ]
-  },
 
-  // Chapter 5: Family Village, lessons 23-27
+  // Chapter 5: Family Village, lessons 16-18
   {
-    id: 23,
+    id: 16,
     stageId: StageId.FamilyVillage,
     code: "fact-family-10",
     name: "Fact Families to 10",
@@ -420,7 +322,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 24,
+    id: 17,
     stageId: StageId.FamilyVillage,
     code: "fact-family-20",
     name: "Fact Families to 20",
@@ -434,7 +336,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 25,
+    id: 18,
     stageId: StageId.FamilyVillage,
     code: "missing-addend",
     name: "Missing Addend Thinking",
@@ -447,38 +349,10 @@ export const STRATEGIES: Strategy[] = [
       "The difference is the missing part."
     ]
   },
-  {
-    id: 26,
-    stageId: StageId.FamilyVillage,
-    code: "chapter-5-practice",
-    name: "Family Village Practice",
-    reason: "You reached the chapter practice!",
-    explanation: "Practice related facts and missing parts.",
-    example: "Fact families and missing addends",
-    thinkSteps: [
-      "Find the whole.",
-      "Find the parts.",
-      "Use the related fact."
-    ]
-  },
-  {
-    id: 27,
-    stageId: StageId.FamilyVillage,
-    code: "review-1-5",
-    name: "Review: Chapters 1-5",
-    reason: "You unlocked a review lesson!",
-    explanation: "Review all one-digit and within-20 strategies before bigger numbers.",
-    example: "A mix of Chapters 1 through 5",
-    thinkSteps: [
-      "Use the fastest strategy you know.",
-      "Check the operation sign.",
-      "Keep going one fact at a time."
-    ]
-  },
 
-  // Chapter 6: Big Number Mountain, lessons 28-35
+  // Chapter 6: Big Number Mountain, lessons 19-25
   {
-    id: 28,
+    id: 19,
     stageId: StageId.BigNumberMountain,
     code: "add-tens",
     name: "Add and Subtract Tens",
@@ -492,7 +366,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 29,
+    id: 20,
     stageId: StageId.BigNumberMountain,
     code: "add-ones-two-digit",
     name: "Add Ones to Two-Digit Numbers",
@@ -506,7 +380,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 30,
+    id: 21,
     stageId: StageId.BigNumberMountain,
     code: "subtract-ones-two-digit",
     name: "Subtract Ones from Two-Digit Numbers",
@@ -520,7 +394,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 31,
+    id: 22,
     stageId: StageId.BigNumberMountain,
     code: "bridge-ones-two-digit",
     name: "Bridge Ones in Two-Digit Numbers",
@@ -534,7 +408,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 32,
+    id: 23,
     stageId: StageId.BigNumberMountain,
     code: "add-two-digit-place",
     name: "Add Two-Digit Numbers by Place Value",
@@ -548,7 +422,7 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 33,
+    id: 24,
     stageId: StageId.BigNumberMountain,
     code: "subtract-two-digit-place",
     name: "Subtract Two-Digit Numbers by Place Value",
@@ -562,11 +436,11 @@ export const STRATEGIES: Strategy[] = [
     ]
   },
   {
-    id: 34,
+    id: 25,
     stageId: StageId.BigNumberMountain,
     code: "compensation",
     name: "Compensation",
-    reason: "You unlocked a new lesson!",
+    reason: "You unlocked the final lesson!",
     explanation: "Make a friendly number, then adjust.",
     example: "39 + 6, 50 - 19",
     thinkSteps: [
@@ -575,34 +449,7 @@ export const STRATEGIES: Strategy[] = [
       "Adjust back if needed."
     ]
   },
-  {
-    id: 35,
-    stageId: StageId.BigNumberMountain,
-    code: "chapter-6-practice",
-    name: "Big Number Mountain Practice",
-    reason: "You reached the final chapter practice!",
-    explanation: "Practice two-digit mental math methods.",
-    example: "Tens, ones, place value, bridging, and compensation",
-    thinkSteps: [
-      "Look for tens and ones.",
-      "Use friendly numbers when they help.",
-      "Keep the method simple."
-    ]
-  },
 ];
-
-export const CUMULATIVE_MAPPING: { [key: string]: string[] } = {
-  "chapter-1-practice": ["same-number", "one-more-less", "two-more-less", "bond-10", "subtract-from-10"],
-  "chapter-2-practice": ["count-on", "count-back", "count-up"],
-  "review-1-2": ["same-number", "one-more-less", "two-more-less", "bond-10", "subtract-from-10", "count-on", "count-back", "count-up"],
-  "chapter-3-practice": ["doubles", "half-facts", "near-double-one", "near-double-two"],
-  "review-1-3": ["same-number", "one-more-less", "two-more-less", "bond-10", "subtract-from-10", "count-on", "count-back", "count-up", "doubles", "half-facts", "near-double-one", "near-double-two"],
-  "chapter-4-practice": ["make-10-add", "bridge-back", "missing-part-10"],
-  "review-1-4": ["same-number", "one-more-less", "two-more-less", "bond-10", "subtract-from-10", "count-on", "count-back", "count-up", "doubles", "half-facts", "near-double-one", "near-double-two", "make-10-add", "bridge-back", "missing-part-10"],
-  "chapter-5-practice": ["fact-family-10", "fact-family-20", "missing-addend"],
-  "review-1-5": ["same-number", "one-more-less", "two-more-less", "bond-10", "subtract-from-10", "count-on", "count-back", "count-up", "doubles", "half-facts", "near-double-one", "near-double-two", "make-10-add", "bridge-back", "missing-part-10", "fact-family-10", "fact-family-20", "missing-addend"],
-  "chapter-6-practice": ["add-tens", "add-ones-two-digit", "subtract-ones-two-digit", "bridge-ones-two-digit", "add-two-digit-place", "subtract-two-digit-place", "compensation"],
-};
 
 function normalizeIdPart(value: string): string {
   const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -964,7 +811,6 @@ function buildSingleStrategyQuestionPool(strategyCode: string): MathQuestion[] {
 }
 
 export function getStrategyCodesForPractice(strategyCode: string): string[] {
-  if (CUMULATIVE_MAPPING[strategyCode]) return CUMULATIVE_MAPPING[strategyCode];
   return [strategyCode];
 }
 

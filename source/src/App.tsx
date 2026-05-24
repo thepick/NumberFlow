@@ -41,6 +41,7 @@ import {
 } from "./adaptiveEngine";
 
 interface SavedProgress {
+  progressSchemaVersion?: number;
   viewedStrategyIds: number[];
   masteredStrategyIds: number[];
   stars: number;
@@ -48,6 +49,106 @@ interface SavedProgress {
   bestStreaks?: { [key: number]: number };
   bestSpeeds?: { [key: number]: number };
   factStats?: FactStatsMap;
+}
+
+const PROGRESS_SCHEMA_VERSION = 2;
+
+const LEGACY_TO_CURRENT_STRATEGY_ID: { [key: number]: number | null } = {
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  6: null,
+  7: 6,
+  8: 7,
+  9: 8,
+  10: null,
+  11: null,
+  12: 9,
+  13: 10,
+  14: 11,
+  15: 12,
+  16: null,
+  17: null,
+  18: 13,
+  19: 14,
+  20: 15,
+  21: null,
+  22: null,
+  23: 16,
+  24: 17,
+  25: 18,
+  26: null,
+  27: null,
+  28: 19,
+  29: 20,
+  30: 21,
+  31: 22,
+  32: 23,
+  33: 24,
+  34: 25,
+  35: null,
+};
+
+function uniqueSortedIds(ids: number[]): number[] {
+  return Array.from(new Set(ids))
+    .filter((id) => id >= 1 && id <= STRATEGIES.length)
+    .sort((a, b) => a - b);
+}
+
+function remapLegacyStrategyIds(ids: number[] | undefined): number[] {
+  if (!ids) return [];
+  return uniqueSortedIds(ids.flatMap((id) => {
+    const mapped = LEGACY_TO_CURRENT_STRATEGY_ID[id];
+    return typeof mapped === "number" ? [mapped] : [];
+  }));
+}
+
+function remapLegacyNumberMap(values: { [key: number]: number } | undefined): { [key: number]: number } {
+  if (!values) return {};
+  return Object.entries(values).reduce<{ [key: number]: number }>((acc, [rawKey, value]) => {
+    const oldId = Number(rawKey);
+    const newId = LEGACY_TO_CURRENT_STRATEGY_ID[oldId];
+    if (typeof newId === "number") {
+      acc[newId] = Math.max(acc[newId] || 0, value);
+    }
+    return acc;
+  }, {});
+}
+
+function normalizeProgressForCurrentLessons(progress: SavedProgress): SavedProgress {
+  if (progress.progressSchemaVersion === PROGRESS_SCHEMA_VERSION) {
+    return {
+      ...progress,
+      viewedStrategyIds: uniqueSortedIds(progress.viewedStrategyIds || [1]).length ? uniqueSortedIds(progress.viewedStrategyIds || [1]) : [1],
+      masteredStrategyIds: uniqueSortedIds(progress.masteredStrategyIds || []),
+    };
+  }
+
+  const mastered = remapLegacyStrategyIds(progress.masteredStrategyIds);
+  let viewed = uniqueSortedIds([
+    ...remapLegacyStrategyIds(progress.viewedStrategyIds),
+    ...mastered,
+    1,
+  ]);
+
+  let nextLessonToUnlock = 1;
+  while (mastered.includes(nextLessonToUnlock) && nextLessonToUnlock <= STRATEGIES.length) {
+    nextLessonToUnlock += 1;
+  }
+  if (nextLessonToUnlock <= STRATEGIES.length && !viewed.includes(nextLessonToUnlock)) {
+    viewed = uniqueSortedIds([...viewed, nextLessonToUnlock]);
+  }
+
+  return {
+    ...progress,
+    progressSchemaVersion: PROGRESS_SCHEMA_VERSION,
+    viewedStrategyIds: viewed,
+    masteredStrategyIds: mastered,
+    bestStreaks: remapLegacyNumberMap(progress.bestStreaks),
+    bestSpeeds: remapLegacyNumberMap(progress.bestSpeeds),
+  };
 }
 
 interface ConfettiPiece {
@@ -419,15 +520,19 @@ export default function App() {
       const saved = localStorage.getItem("mental_math_journey_progress");
       if (saved) {
         const parsed: SavedProgress = JSON.parse(saved);
-        if (parsed.viewedStrategyIds) setViewedStrategyIds(parsed.viewedStrategyIds);
-        if (parsed.masteredStrategyIds) setMasteredStrategyIds(parsed.masteredStrategyIds);
-        if (typeof parsed.stars === "number") setStars(parsed.stars);
-        if (typeof parsed.speedTarget === "number") setSpeedTarget(parsed.speedTarget);
-        if (parsed.bestStreaks) setBestStreaks(parsed.bestStreaks);
-        if (parsed.bestSpeeds) setBestSpeeds(parsed.bestSpeeds);
-        if (parsed.factStats) {
-          setFactStats(parsed.factStats);
-          factStatsRef.current = parsed.factStats;
+        const normalized = normalizeProgressForCurrentLessons(parsed);
+        if (normalized.viewedStrategyIds) setViewedStrategyIds(normalized.viewedStrategyIds);
+        if (normalized.masteredStrategyIds) setMasteredStrategyIds(normalized.masteredStrategyIds);
+        if (typeof normalized.stars === "number") setStars(normalized.stars);
+        if (typeof normalized.speedTarget === "number") setSpeedTarget(normalized.speedTarget);
+        if (normalized.bestStreaks) setBestStreaks(normalized.bestStreaks);
+        if (normalized.bestSpeeds) setBestSpeeds(normalized.bestSpeeds);
+        if (normalized.factStats) {
+          setFactStats(normalized.factStats);
+          factStatsRef.current = normalized.factStats;
+        }
+        if (normalized.progressSchemaVersion !== parsed.progressSchemaVersion) {
+          localStorage.setItem("mental_math_journey_progress", JSON.stringify(normalized));
         }
       }
     } catch (e) {
@@ -462,6 +567,7 @@ export default function App() {
   ) => {
     try {
       const data: SavedProgress = {
+        progressSchemaVersion: PROGRESS_SCHEMA_VERSION,
         viewedStrategyIds: viewed,
         masteredStrategyIds: mastered,
         stars: newStars,
