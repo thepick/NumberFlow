@@ -237,31 +237,55 @@ export function getPriorityReviewQuestions(
   limit: number = 30
 ): MathQuestion[] {
   const fluentMs = getFluentMs(speedTarget);
+  const safeLimit = Math.max(0, Math.min(limit, pool.length));
 
-  return pool
-    .filter((fact) => {
-      const stats = factStats[fact.id];
-      if (!stats || stats.shown === 0) return false;
+  const scored = pool.map((fact) => {
+    const stats = factStats[fact.id];
+    const recent = stats ? stats.recent.slice(-4) : [];
+    const recentWeak = recent.filter((attempt) =>
+      !attempt.isCorrect || attempt.timeout || attempt.responseMs > fluentMs * 2.2
+    ).length;
+    const lastAttempt = recent.length > 0 ? recent[recent.length - 1] : null;
+    const status = stats ? getFactStatus(stats) : "empty";
 
-      const recent = stats.recent.slice(-4);
-      const recentWeak = recent.filter((attempt) =>
-        !attempt.isCorrect || attempt.timeout || attempt.responseMs > fluentMs * 2.2
-      ).length;
-      const lastAttempt = recent.length > 0 ? recent[recent.length - 1] : null;
-      const status = getFactStatus(stats);
-
-      // Old lessons should come back only for true quick review, not simply
-      // because every fact is not fully mastered yet. This keeps new lessons
-      // moving while still catching recent misses, timeouts, and very slow facts.
-      return (
+    // Weak old facts still get first priority. The fallback below only adds
+    // a small mixed set when the priority pool would otherwise be too tiny.
+    const isPriority = !!(
+      stats &&
+      stats.shown > 0 &&
+      (
         status === "needs-support" ||
         recentWeak >= 2 ||
         !!(lastAttempt && (!lastAttempt.isCorrect || lastAttempt.timeout)) ||
         (stats.confidence < 50 && recentWeak >= 1)
-      );
-    })
-    .sort((a, b) => getFactWeight(b, factStats[b.id], speedTarget) - getFactWeight(a, factStats[a.id], speedTarget))
-    .slice(0, limit);
+      )
+    );
+
+    return {
+      fact,
+      isPriority,
+      weight: getFactWeight(fact, stats, speedTarget),
+      // The small random value avoids always choosing the same mastered facts
+      // when the weak-fact pool has to be padded.
+      tieBreaker: Math.random(),
+    };
+  });
+
+  const priority = scored
+    .filter((item) => item.isPriority)
+    .sort((a, b) => (b.weight + b.tieBreaker) - (a.weight + a.tieBreaker));
+
+  if (priority.length >= safeLimit) {
+    return priority.slice(0, safeLimit).map((item) => item.fact);
+  }
+
+  const selectedIds = new Set(priority.map((item) => item.fact.id));
+  const mixedFallback = scored
+    .filter((item) => !selectedIds.has(item.fact.id))
+    .sort((a, b) => (b.weight + b.tieBreaker) - (a.weight + a.tieBreaker))
+    .slice(0, safeLimit - priority.length);
+
+  return [...priority, ...mixedFallback].map((item) => item.fact);
 }
 
 export function mergeUniqueQuestions(...groups: MathQuestion[][]): MathQuestion[] {

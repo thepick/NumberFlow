@@ -350,6 +350,8 @@ export default function App() {
   const roundAttemptsRef = useRef<number>(0);
   const roundCorrectAttemptsRef = useRef<number>(0);
   const roundWrongAttemptsRef = useRef<number>(0);
+  const attemptsSinceQuickReviewRef = useRef<number>(0);
+  const recentReviewFactIdsRef = useRef<string[]>([]);
   const currentStrategyFactsRef = useRef<MathQuestion[]>([]);
   const questionPoolRef = useRef<MathQuestion[]>([]);
   const confettiClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -553,18 +555,60 @@ export default function App() {
     return questionPoolRef.current.filter((fact) => !currentFactIds.has(fact.id));
   };
 
+  const shouldChooseQuickReview = (reviewPoolLength: number): boolean => {
+    if (reviewPoolLength === 0 || roundAttemptsRef.current < 2) return false;
+
+    const attemptsSinceQuickReview = attemptsSinceQuickReviewRef.current;
+    if (attemptsSinceQuickReview < 3) return false;
+    if (attemptsSinceQuickReview >= 7) return true;
+
+    // Roughly one quick-review question every 4-6 answered questions, but not
+    // on a predictable schedule. Larger review pools can appear a little more.
+    const reviewChance = Math.min(0.28, 0.16 + reviewPoolLength * 0.02);
+    return Math.random() < reviewChance;
+  };
+
+  const getSpacedReviewPool = (reviewPool: MathQuestion[], previousId?: string): MathQuestion[] => {
+    if (reviewPool.length <= 1) return reviewPool;
+
+    const recentReviewIds = new Set(recentReviewFactIdsRef.current);
+    const notRecentlyUsed = reviewPool.filter((fact) => fact.id !== previousId && !recentReviewIds.has(fact.id));
+    if (notRecentlyUsed.length > 0) return notRecentlyUsed;
+
+    const notPrevious = reviewPool.filter((fact) => fact.id !== previousId);
+    return notPrevious.length > 0 ? notPrevious : reviewPool;
+  };
+
+  const rememberReviewFact = (factId: string, reviewPoolLength: number) => {
+    const maxRecent = Math.max(1, Math.min(4, reviewPoolLength - 1));
+    recentReviewFactIdsRef.current = [
+      factId,
+      ...recentReviewFactIdsRef.current.filter((id) => id !== factId),
+    ].slice(0, maxRecent);
+  };
+
   const chooseNextRoundFact = (statsSnapshot: FactStatsMap, previousId?: string): MathQuestion | null => {
     const currentPool = currentStrategyFactsRef.current.length > 0
       ? currentStrategyFactsRef.current
       : questionPoolRef.current;
     const reviewPool = getReviewFactsForActiveRound();
-    const shouldUseQuickReview = reviewPool.length > 0 && roundAttemptsRef.current > 0 && roundAttemptsRef.current % 5 === 0;
-    const preferredPool = shouldUseQuickReview ? reviewPool : currentPool;
+    const reviewFactIds = new Set(reviewPool.map((fact) => fact.id));
+    const shouldUseQuickReview = shouldChooseQuickReview(reviewPool.length);
+    const preferredPool = shouldUseQuickReview ? getSpacedReviewPool(reviewPool, previousId) : currentPool;
 
-    return (
+    const selectedFact = (
       chooseNextFact(preferredPool, statsSnapshot, speedTarget, previousId) ||
       chooseNextFact(questionPoolRef.current, statsSnapshot, speedTarget, previousId)
     );
+
+    if (selectedFact && reviewFactIds.has(selectedFact.id)) {
+      attemptsSinceQuickReviewRef.current = 0;
+      rememberReviewFact(selectedFact.id, reviewPool.length);
+    } else {
+      attemptsSinceQuickReviewRef.current += 1;
+    }
+
+    return selectedFact;
   };
 
   const activateQuestion = (question: MathQuestion | null) => {
@@ -616,9 +660,8 @@ export default function App() {
   const finishRound = () => {
     if (roundCompletedRef.current) return;
     roundCompletedRef.current = true;
-    if (currentQuestionRef.current && !answerLockedRef.current) {
-      recordFactAttempt(false, true);
-    }
+    // Do not record the final visible question as a timeout. The student may
+    // have seen it for only a moment when the 60-second round ended.
     setRoundCompleted(true);
   };
 
@@ -643,6 +686,8 @@ export default function App() {
     roundAttemptsRef.current = 0;
     roundCorrectAttemptsRef.current = 0;
     roundWrongAttemptsRef.current = 0;
+    attemptsSinceQuickReviewRef.current = 0;
+    recentReviewFactIdsRef.current = [];
     setCurrentQuestionIdx(0);
     setUserAnswer("");
     setRoundCompleted(false);
@@ -718,6 +763,8 @@ export default function App() {
     roundAttemptsRef.current = 0;
     roundCorrectAttemptsRef.current = 0;
     roundWrongAttemptsRef.current = 0;
+    attemptsSinceQuickReviewRef.current = 0;
+    recentReviewFactIdsRef.current = [];
     setTimeLeft(60); // Reset timer to 1 minute (60 seconds)
     setConsecutiveErrors(0);
     setSpamWarning(null);
