@@ -40,10 +40,22 @@ import {
   updateFactStats,
 } from "./adaptiveEngine";
 
+type StrategyStarAwards = { [key: number]: number };
+
+interface RoundStarResult {
+  strategyId: number;
+  earnedStars: number;
+  previousBestStars: number;
+  bestStars: number;
+  improved: boolean;
+  reachedThreeStars: boolean;
+}
+
 interface SavedProgress {
   viewedStrategyIds: number[];
   masteredStrategyIds: number[];
   stars: number;
+  strategyStars?: StrategyStarAwards;
   speedTarget?: number;
   bestStreaks?: { [key: number]: number };
   bestSpeeds?: { [key: number]: number };
@@ -60,6 +72,43 @@ interface ConfettiPiece {
   drift: number;
   spin: number;
 }
+
+const STARS_PER_STRATEGY = 3;
+const TOTAL_POSSIBLE_STARS = STRATEGIES.length * STARS_PER_STRATEGY;
+
+const clampStrategyStars = (value: number) => Math.max(0, Math.min(STARS_PER_STRATEGY, value));
+
+const countStrategyStars = (awards: StrategyStarAwards) =>
+  Object.values(awards).reduce((total, value) => total + clampStrategyStars(value || 0), 0);
+
+const getStarsForScore = (score: number, speedTargetValue: number) => {
+  const goldMilestone = speedTargetValue;
+  const silverMilestone = Math.max(6, Math.round(speedTargetValue * 0.6));
+  const bronzeMilestone = Math.max(3, Math.round(speedTargetValue * 0.3));
+
+  if (score >= goldMilestone) return 3;
+  if (score >= silverMilestone) return 2;
+  if (score >= bronzeMilestone) return 1;
+  return 0;
+};
+
+const migrateLegacyStars = (savedStars: number, masteredIds: number[], viewedIds: number[]): StrategyStarAwards => {
+  const orderedIds = [...masteredIds, ...viewedIds]
+    .filter((id, index, list) => Number.isInteger(id) && id >= 1 && id <= STRATEGIES.length && list.indexOf(id) === index)
+    .sort((a, b) => a - b);
+
+  let remainingStars = Math.max(0, Math.min(savedStars, orderedIds.length * STARS_PER_STRATEGY, TOTAL_POSSIBLE_STARS));
+  const awards: StrategyStarAwards = {};
+
+  for (const id of orderedIds) {
+    if (remainingStars <= 0) break;
+    const award = Math.min(STARS_PER_STRATEGY, remainingStars);
+    awards[id] = award;
+    remainingStars -= award;
+  }
+
+  return awards;
+};
 
 function printCertificate(
   stageNum: number, 
@@ -367,6 +416,8 @@ export default function App() {
   const [viewedStrategyIds, setViewedStrategyIds] = useState<number[]>([1]);
   const [masteredStrategyIds, setMasteredStrategyIds] = useState<number[]>([]);
   const [stars, setStars] = useState<number>(0);
+  const [strategyStars, setStrategyStars] = useState<StrategyStarAwards>({});
+  const [lastRoundStarResult, setLastRoundStarResult] = useState<RoundStarResult | null>(null);
   const [studentName, setStudentName] = useState<string>("Elite Math Explorer");
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
@@ -423,9 +474,19 @@ export default function App() {
       const saved = localStorage.getItem("mental_math_journey_progress");
       if (saved) {
         const parsed: SavedProgress = JSON.parse(saved);
-        if (parsed.viewedStrategyIds) setViewedStrategyIds(parsed.viewedStrategyIds);
-        if (parsed.masteredStrategyIds) setMasteredStrategyIds(parsed.masteredStrategyIds);
-        if (typeof parsed.stars === "number") setStars(parsed.stars);
+        const savedViewedIds = Array.isArray(parsed.viewedStrategyIds) ? parsed.viewedStrategyIds : [1];
+        const savedMasteredIds = Array.isArray(parsed.masteredStrategyIds) ? parsed.masteredStrategyIds : [];
+        if (parsed.viewedStrategyIds) setViewedStrategyIds(savedViewedIds);
+        if (parsed.masteredStrategyIds) setMasteredStrategyIds(savedMasteredIds);
+        if (parsed.strategyStars && typeof parsed.strategyStars === "object") {
+          const savedAwards = parsed.strategyStars as StrategyStarAwards;
+          setStrategyStars(savedAwards);
+          setStars(countStrategyStars(savedAwards));
+        } else if (typeof parsed.stars === "number") {
+          const migratedAwards = migrateLegacyStars(parsed.stars, savedMasteredIds, savedViewedIds);
+          setStrategyStars(migratedAwards);
+          setStars(countStrategyStars(migratedAwards));
+        }
         if (typeof parsed.speedTarget === "number") setSpeedTarget(parsed.speedTarget);
         if (parsed.bestStreaks) setBestStreaks(parsed.bestStreaks);
         if (parsed.bestSpeeds) setBestSpeeds(parsed.bestSpeeds);
@@ -468,13 +529,18 @@ export default function App() {
     tgt: number = speedTarget,
     streaks: { [key: number]: number } = bestStreaks,
     speeds: { [key: number]: number } = bestSpeeds,
-    stats: FactStatsMap = factStatsRef.current
+    stats: FactStatsMap = factStatsRef.current,
+    nextStrategyStars: StrategyStarAwards = strategyStars
   ) => {
     try {
+      const savedStars = Object.keys(nextStrategyStars).length > 0
+        ? countStrategyStars(nextStrategyStars)
+        : Math.max(0, Math.min(newStars, TOTAL_POSSIBLE_STARS));
       const data: SavedProgress = {
         viewedStrategyIds: viewed,
         masteredStrategyIds: mastered,
-        stars: newStars,
+        stars: savedStars,
+        strategyStars: nextStrategyStars,
         speedTarget: tgt,
         bestStreaks: streaks,
         bestSpeeds: speeds,
@@ -753,6 +819,7 @@ export default function App() {
     clearRoundCountdown();
     setActiveModalStrategy(null); // Close modal
     setActiveStrategyRound(strategy);
+    setLastRoundStarResult(null);
 
     const { currentFacts, practicePool } = buildAdaptivePracticePool(strategy);
     currentStrategyFactsRef.current = currentFacts;
@@ -825,15 +892,26 @@ export default function App() {
       const silverMilestone = Math.max(6, Math.round(speedTarget * 0.6));
       const bronzeMilestone = Math.max(3, Math.round(speedTarget * 0.3));
 
-      let starsGained = 0;
-      if (finalScore >= goldMilestone) starsGained = 3;
-      else if (finalScore >= silverMilestone) starsGained = 2;
-      else if (finalScore >= bronzeMilestone) starsGained = 1;
-
-      const newTotalStars = stars + starsGained;
-      setStars(newTotalStars);
+      const starsGained = getStarsForScore(finalScore, speedTarget);
 
       const id = activeStrategyRound.id;
+      const previousBestStars = clampStrategyStars(strategyStars[id] || 0);
+      const bestStars = Math.max(previousBestStars, starsGained);
+      const updatedStrategyStars = {
+        ...strategyStars,
+        [id]: bestStars,
+      };
+      setLastRoundStarResult({
+        strategyId: id,
+        earnedStars: starsGained,
+        previousBestStars,
+        bestStars,
+        improved: bestStars > previousBestStars,
+        reachedThreeStars: bestStars >= STARS_PER_STRATEGY,
+      });
+      const newTotalStars = countStrategyStars(updatedStrategyStars);
+      setStrategyStars(updatedStrategyStars);
+      setStars(newTotalStars);
       const masterySummary = getStrategyAdaptiveMastery(
         currentStrategyFactsRef.current,
         factStatsRef.current,
@@ -881,7 +959,7 @@ export default function App() {
       setBestStreaks(updatedStreaks);
       setBestSpeeds(updatedSpeeds);
 
-      saveProgress(currentViewed, currentMastered, newTotalStars, speedTarget, updatedStreaks, updatedSpeeds, factStatsRef.current);
+      saveProgress(currentViewed, currentMastered, newTotalStars, speedTarget, updatedStreaks, updatedSpeeds, factStatsRef.current, updatedStrategyStars);
     }
   }, [roundCompleted]);
 
@@ -1077,6 +1155,24 @@ export default function App() {
   };
 
   const currentLevelProgressPercent = Math.round((masteredStrategyIds.length / STRATEGIES.length) * 100);
+  const starProgressText = `${stars}/${TOTAL_POSSIBLE_STARS}`;
+  const getStrategyStarCount = (strategyId: number) => clampStrategyStars(strategyStars[strategyId] || 0);
+  const renderLessonStars = (earnedStars: number, sizeClass: string = "w-3.5 h-3.5") => (
+    <div className="flex items-center gap-0.5" aria-label={`${earnedStars} out of ${STARS_PER_STRATEGY} stars`}>
+      {Array.from({ length: STARS_PER_STRATEGY }, (_, index) => (
+        <Star
+          key={index}
+          className={`${sizeClass} stroke-[2.5] ${
+            index < earnedStars ? "text-yellow-500 fill-yellow-400" : "text-slate-300 fill-slate-100"
+          }`}
+        />
+      ))}
+    </div>
+  );
+  const starUpgradeTargets = STRATEGIES.filter((strategy) => {
+    const earnedStars = getStrategyStarCount(strategy.id);
+    return masteredStrategyIds.includes(strategy.id) && earnedStars > 0 && earnedStars < STARS_PER_STRATEGY;
+  });
 
   // Dynamic chapter unlocking logic
   const isStageUnlocked = (stageId: number) => {
@@ -1117,6 +1213,11 @@ export default function App() {
     ? STRATEGIES.find((strategy) => strategy.id === activeStrategyRound.id + 1)
     : undefined;
   const roundPassTarget = Math.max(bronzeMilestoneForMastery, Math.max(6, Math.round(speedTarget * 0.6)));
+  const roundStarsEarned = getStarsForScore(roundScore, speedTarget);
+  const displayedLastRoundStarResult = lastRoundStarResult && activeStrategyRound && lastRoundStarResult.strategyId === activeStrategyRound.id
+    ? lastRoundStarResult
+    : null;
+  const activeRoundBestStars = activeStrategyRound ? getStrategyStarCount(activeStrategyRound.id) : 0;
   const questionCapsule = (() => {
     if (isQuickReviewFact) {
       return {
@@ -1161,6 +1262,7 @@ export default function App() {
       setViewedStrategyIds([1]);
       setMasteredStrategyIds([]);
       setStars(0);
+      setStrategyStars({});
       setBestSpeeds({});
       setBestStreaks({});
       setFactStats({});
@@ -1226,7 +1328,7 @@ export default function App() {
             <div className="flex shrink-0 items-center gap-2.5 sm:gap-3.5 bg-[#fdfbe7] px-4 sm:px-5 py-1.5 rounded-full border-[3px] border-[#fbcf22] shadow-xs select-none">
               <Star className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 fill-yellow-400 stroke-[2.5]" />
               <div className="flex flex-col text-right leading-none">
-                <span className="font-mono text-xl sm:text-2xl font-black text-blue-950">{stars}</span>
+                <span className="font-mono text-lg sm:text-xl font-black text-blue-950">{starProgressText}</span>
                 <span className="text-[8px] sm:text-[9px] font-black tracking-wider text-blue-700 uppercase mt-0.5 whitespace-nowrap">Stars Earned</span>
               </div>
             </div>
@@ -1349,7 +1451,7 @@ export default function App() {
                       <div className="flex items-center gap-3.5 bg-amber-50 border-[3px] border-amber-400 px-5 py-2 rounded-full shadow-xs select-none">
                         <Star className="w-6 h-6 text-yellow-500 fill-yellow-400 stroke-[2]" />
                         <div className="flex flex-col text-left leading-none">
-                          <span className="font-mono text-xl font-black text-blue-950">{stars}</span>
+                          <span className="font-mono text-xl font-black text-blue-950">{starProgressText}</span>
                           <span className="text-[8px] font-black tracking-wider text-blue-700 uppercase mt-0.5 whitespace-nowrap">Stars Earned</span>
                         </div>
                       </div>
@@ -1400,9 +1502,10 @@ export default function App() {
                         if (confirm("Would you like to restart your journey from Lesson 1? (This keeps your Lessons visible!)")) {
                           setMasteredStrategyIds([]);
                           setStars(0);
+                          setStrategyStars({});
                           // Back to initial Lesson 1
                           setViewedStrategyIds([1]);
-                          saveProgress([1], [], 0);
+                          saveProgress([1], [], 0, speedTarget, bestStreaks, bestSpeeds, factStatsRef.current, {});
                         }
                       }}
                       className="bg-[#FF4757] hover:bg-[#FF6B81] text-white font-black py-4 px-8 rounded-2xl text-sm transition border-2 border-[#D63031] shadow-[0_4px_0px_0px_#D63031] active:translate-y-0.5 active:shadow-none cursor-pointer flex items-center justify-center gap-2"
@@ -1632,12 +1735,59 @@ export default function App() {
                 );
               })()}
 
+              {/* Star upgrade shortcut for passed lessons below 3 stars */}
+              {starUpgradeTargets.length > 0 && (
+                <div className="bg-amber-50/90 border-4 border-amber-300 rounded-[28px] p-5 shadow-[0_5px_0px_0px_#FDE68A] space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                      <h3 className="text-lg font-display font-black text-amber-900 flex items-center gap-2">
+                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-400" />
+                        Try for 3 Stars
+                      </h3>
+                      <p className="text-xs text-amber-800 font-bold">
+                        These passed lessons can be replayed to improve your best star score.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono font-black uppercase tracking-wider text-amber-700 bg-white/80 border border-amber-200 px-3 py-1 rounded-full w-fit">
+                      {starUpgradeTargets.length} lesson{starUpgradeTargets.length === 1 ? "" : "s"} to upgrade
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {starUpgradeTargets.slice(0, 6).map((strategy) => {
+                      const earnedStars = getStrategyStarCount(strategy.id);
+                      return (
+                        <button
+                          key={strategy.id}
+                          onClick={() => {
+                            setCurrentStageId(strategy.stageId);
+                            handleStartPracticeRound(strategy);
+                          }}
+                          className="text-left bg-white hover:bg-yellow-50 border-2 border-amber-200 rounded-2xl p-3 transition cursor-pointer active:translate-y-0.5 shadow-xs"
+                        >
+                          <span className="block text-[10px] font-mono font-black text-amber-700 uppercase">Lesson {strategy.id}</span>
+                          <span className="block text-sm font-black text-blue-950 leading-tight mt-0.5">{strategy.name}</span>
+                          <span className="mt-2 flex items-center justify-between text-xs font-black text-amber-800">
+                            <span className="flex items-center gap-1">
+                              {renderLessonStars(earnedStars, "w-3 h-3")}
+                              {earnedStars}/3
+                            </span>
+                            <span>Replay</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Lesson grid list for active chapter */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {activeStrategies.map((strategy, sIdx) => {
                   const isViewed = viewedStrategyIds.includes(strategy.id);
                   const isMastered = masteredStrategyIds.includes(strategy.id);
                   const isUnlocked = strategy.id === 1 || isViewed || isMastered;
+                  const earnedStars = getStrategyStarCount(strategy.id);
 
                   return (
                     <div 
@@ -1657,7 +1807,15 @@ export default function App() {
                             Lesson {strategy.id}/{STRATEGIES.length}
                           </span>
                           
-                          <div className="flex gap-1.5">
+                          <div className="flex flex-wrap justify-end gap-1.5">
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full border flex items-center gap-1 font-black uppercase ${
+                              isUnlocked
+                                ? "bg-white text-amber-700 border-amber-200"
+                                : "bg-slate-100 text-slate-400 border-slate-200"
+                            }`}>
+                              {renderLessonStars(earnedStars, "w-3 h-3")}
+                              {earnedStars}/3
+                            </span>
                             {isMastered ? (
                               <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1 font-black uppercase">
                                 <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" /> Complete
@@ -1719,7 +1877,7 @@ export default function App() {
                           }`}
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
-                          Start Practice
+                          {isMastered ? (earnedStars >= STARS_PER_STRATEGY ? "Replay Practice" : "Try for 3 Stars") : "Start Practice"}
                         </button>
                       </div>
 
@@ -1754,6 +1912,7 @@ export default function App() {
                 const isViewed = viewedStrategyIds.includes(strategy.id);
                 const isMastered = masteredStrategyIds.includes(strategy.id);
                 const isUnlocked = strategy.id === 1 || isViewed || isMastered;
+                const earnedStars = getStrategyStarCount(strategy.id);
                 const ownStageValue = STAGES.find(s => s.id === strategy.stageId) || STAGES[0];
 
                 return (
@@ -1775,11 +1934,23 @@ export default function App() {
                         Lesson {strategy.id} of {STRATEGIES.length}
                       </span>
 
-                      {/* Chapter indicator */}
-                      <span className="text-xs bg-blue-50 border border-blue-200 px-3 py-1 font-black flex items-center gap-1.5 rounded-full text-blue-900 w-fit">
-                        <span>{ownStageValue.emoji}</span>
-                        <span>{ownStageValue.name}</span>
-                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {/* Star indicator */}
+                        <span className={`text-xs border px-3 py-1 font-black flex items-center gap-1.5 rounded-full w-fit ${
+                          isUnlocked
+                            ? "bg-amber-50 border-amber-200 text-amber-800"
+                            : "bg-slate-50 border-slate-200 text-slate-400"
+                        }`}>
+                          {renderLessonStars(earnedStars, "w-3 h-3")}
+                          <span>{earnedStars}/3 stars</span>
+                        </span>
+
+                        {/* Chapter indicator */}
+                        <span className="text-xs bg-blue-50 border border-blue-200 px-3 py-1 font-black flex items-center gap-1.5 rounded-full text-blue-900 w-fit">
+                          <span>{ownStageValue.emoji}</span>
+                          <span>{ownStageValue.name}</span>
+                        </span>
+                      </div>
                     </div>
 
                     <div className="max-w-xl">
@@ -1838,7 +2009,7 @@ export default function App() {
                       {/* Footer Tip & Run */}
                       <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-3 pt-3.5 border-t-2 border-slate-100 text-xs">
                         <span className="text-gray-400 font-bold">
-                          {isUnlocked ? "Use this when it helps." : "Secret mental math trick hidden inside."}
+                          {isUnlocked ? `Best stars: ${earnedStars}/3` : "Secret mental math trick hidden inside."}
                         </span>
                         
                         <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
@@ -1852,7 +2023,7 @@ export default function App() {
                             }`}
                           >
                             <Play className="w-3 h-3 fill-current" />
-                            Start Practice
+                            {isMastered ? (earnedStars >= STARS_PER_STRATEGY ? "Replay Practice" : "Try for 3 Stars") : "Start Practice"}
                           </button>
                         </div>
                       </div>
@@ -1941,6 +2112,17 @@ export default function App() {
                         <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
                           Answer as many as you can in 1 minute.
                         </p>
+                        <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-amber-50 border-2 border-amber-200 px-4 py-2 rounded-2xl text-xs font-black text-amber-800">
+                          <span>Best:</span>
+                          {renderLessonStars(activeRoundBestStars, "w-4 h-4")}
+                          <span>{activeRoundBestStars}/3 stars</span>
+                          {activeRoundBestStars > 0 && activeRoundBestStars < STARS_PER_STRATEGY && (
+                            <span className="text-blue-800">- Try to upgrade!</span>
+                          )}
+                          {activeRoundBestStars >= STARS_PER_STRATEGY && (
+                            <span className="text-emerald-700">- Top score earned</span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Practice goal grid */}
@@ -2227,16 +2409,29 @@ export default function App() {
                     <span className="text-4xl font-mono font-black text-blue-950">{roundScore} correct in 1 min</span>
                     <span className="block text-xs text-slate-500 font-black mt-1">{roundAccuracyPercent}% correct</span>
                     
-                    <div className="mt-4 pt-3 border-t border-yellow-200 text-xs text-blue-950 font-black space-y-1">
-                      {roundScore >= speedTarget ? (
-                        <p className="text-amber-600 font-black text-sm">🏆 Gold! 3 stars earned! 🏆</p>
-                      ) : roundScore >= Math.max(6, Math.round(speedTarget * 0.6)) ? (
-                        <p className="text-slate-700 font-black text-sm">🥈 Silver! 2 stars earned! 🥈</p>
-                      ) : roundScore >= Math.max(3, Math.round(speedTarget * 0.3)) ? (
-                        <p className="text-amber-800 font-semibold">🥉 Bronze! 1 star earned! 🥉</p>
+                    <div className="mt-4 pt-3 border-t border-yellow-200 text-xs text-blue-950 font-black space-y-2">
+                      <div className="flex items-center justify-center gap-2">
+                        {renderLessonStars(roundStarsEarned, "w-5 h-5")}
+                        <span className="text-sm">{roundStarsEarned}/3 stars this round</span>
+                      </div>
+
+                      {roundStarsEarned >= STARS_PER_STRATEGY ? (
+                        <p className="text-amber-600 font-black text-sm">🏆 Gold! Top star score! 🏆</p>
+                      ) : roundStarsEarned === 2 ? (
+                        <p className="text-slate-700 font-black text-sm">🥈 Silver! Try again for 3 stars.</p>
+                      ) : roundStarsEarned === 1 ? (
+                        <p className="text-amber-800 font-semibold">🥉 Bronze! Try again to upgrade.</p>
                       ) : (
                         <p className="text-slate-500 font-bold max-w-xs mx-auto leading-snug">
                           🌿 Try again for {roundPassTarget}+ facts with 80% accuracy.
+                        </p>
+                      )}
+
+                      {displayedLastRoundStarResult && (
+                        <p className={`max-w-xs mx-auto leading-snug ${displayedLastRoundStarResult.improved ? "text-emerald-700" : "text-blue-800"}`}>
+                          {displayedLastRoundStarResult.improved
+                            ? `New best! Improved from ${displayedLastRoundStarResult.previousBestStars}/3 to ${displayedLastRoundStarResult.bestStars}/3.`
+                            : `Best stays at ${displayedLastRoundStarResult.bestStars}/3 stars.`}
                         </p>
                       )}
                     </div>
@@ -2244,11 +2439,15 @@ export default function App() {
 
                   <div className={`border-2 p-4 rounded-2xl max-w-lg mx-auto text-center space-y-2 ${activeStrategyPassed ? "bg-emerald-50/80 border-emerald-200" : "bg-blue-50/70 border-blue-100"}`}>
                     <span className={`text-[10px] font-black font-mono uppercase tracking-widest block ${activeStrategyPassed ? "text-emerald-700" : "text-blue-700"}`}>
-                      {activeStrategyPassed ? "Next lesson unlocked" : "Keep practicing"}
+                      {activeStrategyPassed
+                        ? activeRoundBestStars >= STARS_PER_STRATEGY
+                          ? "Lesson at 3 stars"
+                          : "Lesson passed - stars can improve"
+                        : "Keep practicing"}
                     </span>
                     {activeStrategyPassed ? (
                       <p className="text-sm text-emerald-800 font-black leading-relaxed">
-                        You passed this lesson. Keep going!
+                        Your best for this lesson is now {activeRoundBestStars}/3 stars. Replays can only improve your best score.
                       </p>
                     ) : (
                       <p className="text-sm text-slate-700 font-bold leading-relaxed">
