@@ -2,8 +2,6 @@
 
 Mental Math Journey is a classroom-friendly mental math practice app for elementary students. It turns addition, subtraction, and two-digit mental calculation strategies into a six-stage adventure with short timed sprints, strategy lesson slides, adaptive review, and local progress tracking.
 
-The rebuilt app is no longer the old NumberFlow Google-sync build. It is a React/Vite static app with a production `index.html` at the project root and the editable source code included in the `source/` folder.
-
 ## What the app does
 
 Students move through a guided map of math strategy stops. Each stop introduces a specific mental math idea, gives a short explanation and example, then lets students practice with a 1-minute sprint.
