@@ -146,9 +146,10 @@ export const STRATEGIES: Strategy[] = [
     code: "bond-10",
     name: "Make 10 Pairs",
     reason: "You unlocked a new lesson!",
-    explanation: "Learn the partner numbers that make 10.",
-    example: "4 + 6 = 10",
+    explanation: "Find the missing partner number that makes 10.",
+    example: "4 + ? = 10",
     thinkSteps: [
+      "Look at the number you have.",
       "Think of the partner that fills 10.",
       "1 and 9, 2 and 8, 3 and 7, 4 and 6, 5 and 5 all make 10."
     ]
@@ -543,12 +544,50 @@ function buildSingleStrategyQuestionPool(strategyCode: string): MathQuestion[] {
       break;
     }
     case "bond-10": {
-      range(0, 10).forEach((left) => {
-        const right = 10 - left;
-        list.push(makeQuestion({ strategyCode, question: `${left} + ${right}`, answer: 10, hint: `${left} and ${right} are partners that make 10.`, family: "make-10", difficulty: 1 }));
-        if (left !== right) {
-          list.push(makeQuestion({ strategyCode, question: `${right} + ${left}`, answer: 10, hint: `${right} and ${left} are partners that make 10.`, family: "make-10", difficulty: 1 }));
+      range(0, 10).forEach((part) => {
+        const missing = 10 - part;
+        const partnerHint = `${part} and ${missing} are partners that make 10.`;
+
+        list.push(makeQuestion({
+          strategyCode,
+          question: `${part} + ? = 10`,
+          answer: missing,
+          hint: partnerHint,
+          family: "make-10-missing-part",
+          difficulty: 1
+        }));
+
+        if (part !== missing) {
+          list.push(makeQuestion({
+            strategyCode,
+            question: `? + ${part} = 10`,
+            answer: missing,
+            hint: partnerHint,
+            family: "make-10-missing-part",
+            difficulty: 1
+          }));
         }
+
+        list.push(makeQuestion({
+          strategyCode,
+          question: `10 = ${part} + ?`,
+          answer: missing,
+          hint: partnerHint,
+          family: "make-10-equation",
+          difficulty: 1
+        }));
+      });
+
+      range(1, 5).forEach((left) => {
+        const right = 10 - left;
+        list.push(makeQuestion({
+          strategyCode,
+          question: `${left} + ${right}`,
+          answer: 10,
+          hint: `${left} and ${right} are partners that make 10.`,
+          family: "make-10-full-fact",
+          difficulty: 1
+        }));
       });
       break;
     }
