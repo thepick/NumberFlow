@@ -1563,7 +1563,7 @@ export default function App() {
                             Adaptive Practice Engine
                           </span>
                           <p className="text-[10px] text-slate-600 font-bold leading-relaxed mt-1">
-                            The app now tracks each fact by speed and accuracy. Facts that are slow or missed will appear more often.
+                            The app tracks each fact by speed and accuracy. Facts that are slow or missed will appear more often.
                           </p>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px] font-black">
