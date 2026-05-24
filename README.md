@@ -1,403 +1,302 @@
-# NumberFlow
+# Mental Math Journey
 
-NumberFlow is an addition and subtraction fluency web app designed for classroom practice. It helps young learners build speed, accuracy, and confidence with mental math through short timed rounds, adaptive review, and clear progress tracking.
+Mental Math Journey is a classroom-friendly mental math practice app for elementary students. It turns addition, subtraction, and two-digit mental calculation strategies into a six-stage adventure with short timed sprints, strategy lesson slides, adaptive review, and local progress tracking.
 
-NumberFlow was built from the FactFlow engine, but it is adapted for early addition, subtraction, and mental math strategies rather than multiplication tables.
+The rebuilt app is no longer the old NumberFlow Google-sync build. It is a React/Vite static app with a production `index.html` at the project root and the editable source code included in the `source/` folder.
 
-## What it does
+## What the app does
 
-NumberFlow gives students focused addition and subtraction practice while tracking how they are doing on each item. The app adjusts practice based on performance, so items that are slow, missed, timed out, not started, or not yet mastered can appear more often while mastered items gradually need less attention.
+Students move through a guided map of math strategy stops. Each stop introduces a specific mental math idea, gives a short explanation and example, then lets students practice with a 1-minute sprint.
 
-Students sign in with Google before practicing. Progress is synced through Google Drive app data storage, so students can continue their practice across supported devices when signed in with the same Google account.
+During practice, the app tracks each fact or question by accuracy, response time, and recent performance. Facts that are slow, missed, or still developing appear more often. Facts that are fluent appear less often, but can still come back for review.
 
-NumberFlow does not require a separate database or a custom backend.
+Progress is saved in the browser using `localStorage`. The app does not require Google sign-in, Google Drive sync, a database, or a custom backend.
 
 ## Key features
 
-- Google sign-in required before practice
-- Timed addition and subtraction practice rounds, with a short get-ready countdown
-- Adaptive item selection based on accuracy, speed, confidence, and recent performance
-- Six progressive stages from anchor facts to two-digit mental math methods
-- Added within-10 +3/+4 practice and near-double subtraction inverse practice
-- Cluster-based unlocking so students see new groups only when they are ready
-- Next Up practice queue showing current items and review items
-- Stage Map showing current, locked, mastered, review, learning, and needs-practice groups
-- Progress states for Mastered, Review Soon, Almost There, Learning, Needs Practice, and Not Started items
-- Mastery score and progress graph with recent/all-results views
-- Average speed and accuracy shown for the visible graph results
-- Kid-friendly mastery logic so early facts can turn green without requiring perfection
-- More stable mastered items, with Review Soon used before an item drops back down
-- Streak, best streak, speed, and best-speed tracking
-- Adjustable speed target: 10, 15, 20, 25, or 30 items/min
-- Daily practice goal of 5 rounds
-- Light mode, dark mode, and match-device appearance options
-- Optional mobile haptic feedback on supported devices
-- Google Drive app data sync without a separate database or a custom backend
-- Sync status shown in the app header
-- Sync now, sign-out, and reset-progress options
-- Confetti for sub-stage unlocks and main-stage graduation
-- Final completion celebration when all stages are complete
+- Six adventure stages from anchor facts to two-digit mental math strategies
+- 28 lesson and review stops across the full journey
+- Strategy lesson slides with examples and step-by-step thinking prompts
+- 1-minute timed sprints for each unlocked strategy stop
+- Adaptive practice engine that prioritizes slow, missed, or weaker facts
+- Fact status tracking: Needs Practice, Almost There, Review Soon, and Fluent
+- Fact Readiness Check after each sprint
+- Star rewards based on the selected speed target
+- Journey map showing unlocked, locked, and mastered stops
+- All Lessons view for reviewing every strategy slide
+- Best speed and best streak tracking for each stop
+- Student-friendly visual feedback for correct and incorrect answers
+- Settings panel for speed target and progress reset
+- Printable completion certificates for stage completion and full journey completion
+- Static production build that can run from the top-level `index.html`
+- Editable React/Vite source included in the `source/` folder
 
-## Google sign-in and sync
+## How students use it
 
-NumberFlow requires students to sign in with Google before they can begin practicing in the current classroom/shared-device configuration.
+1. Open `index.html`.
+2. Choose an unlocked stop on the Adventure Map.
+3. Read or review the strategy slide.
+4. Start the 1-minute sprint.
+5. Type answers using the on-screen keypad or keyboard.
+6. Review the sprint results, speed score, accuracy, and Fact Readiness Check.
+7. Practice again or return to the map to continue the journey.
 
-Progress is synced using the student's Google Drive app data folder. This keeps the NumberFlow progress file separate from the student's normal visible Google Drive files and limits the app to its own stored progress data.
+## Main student screens
 
-Sync is designed for classroom use:
+### Adventure Map Stages
 
-- Students sign in with Google to start practicing.
-- Progress is saved during practice.
-- Before a round starts, the app can sync recent Google progress when needed.
-- If Google sync is available, progress is saved to Google Drive app data storage.
-- When the app is opened on another supported device, the student's saved progress can be loaded and merged.
-- If sync is interrupted, the app can continue using locally cached progress during the active signed-in session.
-- Sync can resume when the connection and Google session are available again.
+The map shows the six stages of the journey. Each stage contains a set of strategy stops. Students unlock new stops by showing enough readiness on the current stop.
 
-## Designed for students
+### All Math Lessons
 
-The interface is simple and classroom-friendly. Students can start a round, answer using the on-screen keypad, and see immediate feedback.
+This screen lists all 28 strategy slides. It works like a teacher and student guide, letting students review explanations, examples, and thinking steps before practicing.
 
-The progress tools help students and teachers quickly understand which items are mastered, which items are nearly ready, which items are still developing, and which items need more practice.
+### Practice Game
 
-The right-side progress panel includes:
+This is the active sprint screen. Students answer as many questions as they can in 60 seconds. The app records correct answers, incorrect answers, speed, streaks, and fact-level progress.
 
-- **Next Up** - a readable list of the items the student is working on now
-- **Stage Map** - a compact overview of the current stage and its locked or unlocked clusters
-- **Mastery Over Time** - a progress graph for long-term growth
+### Sprint completion screen
 
-## Mastery and progress
+After each sprint, students see:
 
-NumberFlow tracks each addition, subtraction, and mental math item individually. An item can move through different progress states based on accuracy, speed, confidence, and recent performance.
+- Speed Score: how many facts were answered correctly in 1 minute
+- Accuracy: the percentage of attempted answers that were correct
+- Star reward: bronze, silver, or gold based on the speed target
+- Fact Readiness Check: a clearer summary of whether the strategy is ready to unlock
 
-The mastery system is intentionally friendly for younger learners. Early stages can turn green with fewer strong answers than later stages, but the app still watches for slow, wrong, or timed-out attempts. Mastered items are more stable, so one typo or one slow answer should not immediately erase progress. A mastered item may move to Review Soon when it shows a small weakness, but repeated weakness is needed before progress is reduced further.
+The Fact Readiness Check uses these labels:
 
-The progress graph shows growth over time using saved quiz results. Started items that are not yet mastered also contribute partial progress to the mastery score, so students can see improvement while items are still developing.
+| Label | Meaning |
+|---|---|
+| Ready facts | Facts currently marked Review Soon or Fluent |
+| Need practice | Facts currently marked Struggling |
+| Tried so far | Different facts from the strategy pool that have appeared at least once |
 
 ## Stages and content
 
-NumberFlow is designed to follow methods used in modern, research-backed math curricula (such as Cognitively Guided Instruction or Math Recovery) that prioritize number sense over rote memorization. Instead of grouping math facts by traditional number families (e.g., "the 1s" or "the 2s"), the app groups them sequentially by **mental math strategies**.
+Mental Math Journey groups practice by strategy rather than by traditional number families. Cumulative quiz and mega review stops reuse facts from earlier strategy pools, so the counts below describe the unique generated base questions introduced in each stage.
 
-NumberFlow includes 326 total items across six stages:
+| Stage | World | Main content | Strategy stops | Unique base questions |
+|---:|---|---|---:|---:|
+| 1 | Starter Island | Zero facts, one more/less, two more/less, make-10 pairs, subtract from 10 | 6 | 183 |
+| 2 | Counting Trail | Count-on addition, count-back subtraction, count-up subtraction | 5 | 92 |
+| 3 | Doubles Forest | Doubles, halves, near doubles, near-double subtraction | 5 | 44 |
+| 4 | Bridge Town | Make-10 addition and bridge-back subtraction | 4 | 42 |
+| 5 | Family Village | Inverse thinking and fact families to 20 | 3 | 20 |
+| 6 | Big Number Mountain | Compensation, partitioning, and bridging across tens | 5 | 588 |
+|  | Total |  | 28 | 969 |
 
-| Stage | Name | Content | Items |
-|---|---|---|---:|
-| 1 | Anchor Facts | Bonds to 10, +/-0, +/-1, +/-2, subtract from 10 | 82 |
-| 2 | Counting Strategies | Within-10 +3/+4 facts, related subtraction facts, count on, count back, count up | 83 |
-| 3 | Doubles and Near Doubles | Double facts, half facts, near-double addition, and near-double subtraction inverses | 56 |
-| 4 | Make 10 and Bridge | Make-10 addition, bridge-back subtraction | 42 |
-| 5 | Fact Families | Complements to 20, inverse thinking | 28 |
-| 6 | Two-Digit Methods | Compensation, partitioning, flexible bridging | 35 |
+## Strategy stops
 
-### Progression Logic: Mixed vs. Separated Operations
+| Stop | Stage | Strategy |
+|---:|---|---|
+| 1 | Starter Island | Same Number Facts |
+| 2 | Starter Island | One More and One Less |
+| 3 | Starter Island | Two More and Two Less |
+| 4 | Starter Island | Make 10 Pairs |
+| 5 | Starter Island | Subtract from 10 |
+| 6 | Starter Island | Starter Island Cumulative Quiz |
+| 7 | Counting Trail | Count On to Add |
+| 8 | Counting Trail | Count Back to Subtract |
+| 9 | Counting Trail | Count Up to Subtract |
+| 10 | Counting Trail | Counting Trail Cumulative Quiz |
+| 11 | Counting Trail | Mega Review (Stages 1-2) |
+| 12 | Doubles Forest | Doubles and Half Facts |
+| 13 | Doubles Forest | Near Doubles to Add |
+| 14 | Doubles Forest | Near Doubles Backwards |
+| 15 | Doubles Forest | Doubles Forest Cumulative Quiz |
+| 16 | Doubles Forest | Mega Review (Stages 1-3) |
+| 17 | Bridge Town | Make 10 Addition |
+| 18 | Bridge Town | Bridge Back Subtraction |
+| 19 | Bridge Town | Bridge Town Cumulative Review |
+| 20 | Bridge Town | Mega Review (Stages 1-4) |
+| 21 | Family Village | Think Inverse |
+| 22 | Family Village | Family Village Cumulative Quiz |
+| 23 | Family Village | Mega Review (Stages 1-5) |
+| 24 | Big Number Mountain | Make a Friendly Number |
+| 25 | Big Number Mountain | Split Tens and Ones |
+| 26 | Big Number Mountain | Bridge Across Tens |
+| 27 | Big Number Mountain | Big Mountain Cumulative Review |
+| 28 | Big Number Mountain | Mega Review (ALL STAGES 1-6) |
 
-The flow from one level to the next is carefully structured to manage a young learner's cognitive load:
+## Adaptive practice and mastery
 
-- **Mixed early operations:** In early anchor clusters, addition and subtraction are mixed together when the relationship is simple and transparent, such as `+0/-0`, `+1/-1`, and `+2/-2`. This helps students see addition and subtraction as inverse operations while still practicing careful attention to the operation sign.
-- **Within-10 gap coverage:** Stage 2 now begins with missing within-10 `+3` and `+4` facts and their related subtraction facts. This gives students more practice with basic facts such as `5 + 3`, `6 + 3`, `8 - 5`, and `9 - 6` before they move into larger within-20 counting strategies.
-- **Strategy-based counting practice:** Stage 2 then extends into count-on addition, count-back subtraction, and count-up subtraction within 20. Count-up subtraction is especially useful because it encourages students to think about the distance between two numbers instead of counting backward many times.
-- **Near-double inverse practice:** Stage 3 includes doubles, half facts, near-double addition, and near-double subtraction inverses. This helps students connect facts such as `7 + 8 = 15` with related subtraction facts such as `15 - 7 = 8` and `15 - 8 = 7`.
-- **Separated advanced operations:** As strategies become more complex, such as Make 10 and Bridge in Stage 4, addition and subtraction are separated into distinct clusters. Bridging requires holding multiple steps in working memory, such as `8 + 5 -> 8 + 2 + 3 -> 13`, so the app gives students space to build the addition strategy before practicing the more demanding bridge-back subtraction strategy.
+The app tracks each fact or question individually. For each attempt, it records whether the answer was correct, how long the student took, and whether the fact has been slow or missed recently.
 
+The adaptive engine uses this information to choose what appears next. Facts with weaker performance receive higher weight. Fluent facts receive lower weight, so students spend more time on what still needs practice.
 
-## Privacy and storage
+A strategy stop is ready to unlock the next stop when the student shows enough overall readiness. The current mastery check looks for:
 
-NumberFlow requires students to sign in with Google before practicing in the current configuration.
+- At least bronze speed for the current speed target
+- At least 80% accuracy in the sprint
+- At least 35% of the strategy facts seen
+- At least 70% of the strategy facts marked Review Soon or Fluent
+- No more than 15% of the strategy facts marked Struggling
 
-Progress is stored for the signed-in Google user and synced through the student's Google Drive app data folder. The sync file is used for NumberFlow progress data and is not meant to appear in the student's normal Google Drive files.
+This means a high sprint score alone is not always enough. The app also checks whether enough individual facts are becoming ready.
 
-NumberFlow does not require a separate database or a custom server.
+## Fact status labels
 
-NumberFlow does not store class lists or other unnecessary classroom records in the progress data. The app uses Google sign-in to connect the practice data to the student's own Google account.
-
-If a student signs out, clears browser data, changes devices, loses internet access, or loses access to Google sync, locally cached progress on that device may not remain available. Synced progress can be restored when the student signs in again and sync is available.
-
-## Best use case
-
-NumberFlow works well for daily addition and subtraction fluency practice in early elementary classrooms, intervention groups, math centers, homework stations, or independent review.
-
-It is especially useful when students need quick, repeated practice sessions with clear feedback, manageable goals, visible progress, and progress syncing across supported devices.
-
-## How practice, progress, and mastery work
-
-This section explains what a student experiences from their very first round to full completion, and how the app decides what to show them and when.
-
----
-
-### The big picture
-
-NumberFlow tracks every practice item individually across the six stages. Each item has its own progress state based on how accurately and how quickly the student has answered it across multiple attempts. The app uses this information to decide which items to show more often and which items are ready to take a back seat.
-
-Progress moves in one direction by default - forward - but the app watches for signs of weakness and will bring an item back for review if needed.
-
----
-
-### Starting out
-
-A new student begins in Stage 1, Anchor Facts. The app starts with the first unlocked cluster and opens more clusters inside the stage as the student shows readiness. Items from later clusters and stages are shown as not started or locked and do not appear in practice yet.
-
-When an item appears for the very first time, a **"New fact!"** label is shown. Very slow correct answers on new items receive smaller confidence gains, but they are not treated the same as wrong answers. Wrong answers and timeouts still count as weak attempts.
-
----
-
-### What happens during a round
-
-Each round is timed. The default round length is 60 seconds. Pressing Start begins a short get-ready countdown before the first item appears.
-
-The student answers as many items as they can before time runs out. The app chooses which item to show next based on a weighted selection. Items that are Not Started, Learning, Almost There, Needs Practice, overdue for review, or recently answered incorrectly are more likely to appear. Items that are already Mastered and recently answered correctly are less likely to appear, giving room for weaker items.
-
-For each answer, the app records:
-
-- Whether it was correct, wrong, or timed out
-- How long it took, measured as response time in milliseconds
-- How the response time compares with the current speed target and fluency timing
-- The item's recent attempts, confidence, and display status
-
-**Wrong answers** reset the current streak and lower the item's confidence score. If the student enters repeated wrong answers on the same item, the app briefly shows a reminder to slow down and read carefully.
-
-**Timeouts** happen when there is no answer within 12 seconds. A timeout counts as a weak attempt. The correct answer is shown, and the student must type it before moving on. This turns a timeout into a small learning moment rather than just skipping past the item.
-
----
-
-### How an item changes color
-
-Each item in the Stage Map has one of six student-facing states:
-
-| Color | State | What it means |
+| Internal status | Student-facing idea | What it means |
 |---|---|---|
-| Dark green | **Mastered** | Accurate and quick enough for now. This item counts fully toward mastery. |
-| Dark green with a small yellow dot | **Review Soon** | Still counts as mastered, but the app has noticed a small weakness and will review it sooner. |
-| Light green with a dashed border | **Almost There** | Nearly mastered. A few more good answers can turn it fully green. |
-| Yellow | **Learning** | Started, but not yet fast or consistent enough. |
-| Red / pink | **Needs Practice** | Recently missed, timed out, or repeatedly slow. |
-| Grey | **Not Started** | Not started yet, locked, or not yet reached in practice. |
+| Struggling | Needs Practice | The fact has been missed, slow, or weak recently |
+| Learning | Needs Practice | The fact has started but is not ready yet |
+| Near-ready | Almost There | The fact is improving but needs more evidence |
+| Review | Review Soon | The fact is mostly ready but should return for review |
+| Fluent | Fluent | The fact is accurate and quick enough for now |
+| Empty | Not Started | The fact has not appeared yet |
 
-An item usually moves from Not Started to Learning, then toward Almost There and Mastered as the student answers it correctly and quickly across multiple spaced attempts. An item can also become Needs Practice after missed, timed-out, or repeatedly slow attempts.
+## Stars and speed targets
 
----
+Each sprint lasts 60 seconds, so the number of correct answers is also the student's facts-per-minute score for that sprint.
 
-### What "Mastered" actually requires
+The speed target can be changed in the settings menu.
 
-An item reaches **Mastered** status only when the app has enough recent evidence that the student can answer it accurately and quickly enough for that stage.
+| Speed target | Bronze | Silver | Gold |
+|---:|---:|---:|---:|
+| 10 correct/min | 3 | 6 | 10 |
+| 15 correct/min | 5 | 9 | 15 |
+| 20 correct/min | 6 | 12 | 20 |
+| 30 correct/min | 9 | 18 | 30 |
+| 40 correct/min | 12 | 24 | 40 |
 
-The exact thresholds are stage-aware. Early stages are more forgiving, while later mental math stages require stronger confidence and more attempts. In general, the app checks that:
+The default speed target in the rebuilt app is 20 correct facts per minute.
 
-- The item has been shown enough times for its current stage.
-- The confidence score has reached the stage's mastery threshold.
-- Recent attempts are correct.
-- Most recent correct attempts are within the fluent or timely response range.
-- The most recent attempt was not wrong and did not time out.
-- There are not too many recent weak attempts, wrong answers, or timeouts.
+## Progress storage
 
-This means a student cannot turn every item green from one lucky answer. The app waits for repeated success, but it stays friendlier than the multiplication version because NumberFlow is aimed at younger students.
+Progress is stored locally in the browser.
 
----
+Main storage key:
 
-### Protecting mastered items
+```text
+mental_math_journey_progress
+```
 
-Once an item is Mastered, it is protected. One typo, one timeout, or one very slow answer will not immediately erase progress.
+Stored progress includes:
 
-A mastered item may first become Review Soon. Review Soon still counts as mastered, but it tells the app to bring the item back sooner. The item drops out of mastery only after repeated weakness or a larger confidence drop.
+- Viewed strategy stops
+- Mastered strategy stops
+- Total stars earned
+- Current speed target
+- Best streaks by strategy stop
+- Best speeds by strategy stop
+- Fact-level adaptive statistics
 
-This makes the system feel fair. A student who genuinely knows an item will not lose progress from a single bad moment.
+Because the app uses browser storage, progress is tied to the device and browser profile. Clearing site data, using a different browser, or changing devices may remove or hide existing progress.
 
----
+## Privacy and classroom use
 
-### Opening more items in the current stage
+Mental Math Journey does not require students to sign in. It does not send student progress to Google Drive and does not require a remote database.
 
-The current stage does not show every item right away. Each stage is divided into smaller clusters. More clusters open when the previous cluster has been fully seen and enough items are ready, nearly ready, or mastered.
-
-Readiness is based on repeated practice, accuracy, confidence, and response time. This keeps the app from overwhelming a student with too many new items at once.
-
----
-
-### Moving to the next stage
-
-A student graduates to the next stage only after the current stage has been fully opened and every item in that stage has been answered at least once.
-
-A regular graduation happens when there are no Needs Practice items in the current stage and enough items are Mastered or Review Soon.
-
-A very strong round can also trigger graduation when the student has enough attempts, reaches strong accuracy, meets or beats the speed target, has no Needs Practice items, and has enough items that are mastered or nearly ready.
-
-When the student graduates, a stage-unlock message appears and confetti plays. Items from previous stages are still reviewed occasionally so earlier learning is not forgotten.
-
----
-
-### Speed target
-
-The speed target is intentionally set for young students.
-
-Available speed targets:
-
-| Setting | Items per minute |
-|---|---:|
-| 1 | 10 |
-| 2 | 15 |
-| 3 | 20 |
-| 4 | 25 |
-| 5 | 30 |
-
-Default: 10 items per minute.
-
-The speed target affects the speed bar, graph scoring, and mastery timing. It is saved with the student's progress so each signed-in user can have a different target.
-
----
-
-### The mastery score
-
-The mastery score is shown as a number out of 100. It reflects progress across all 326 items.
-
-It is calculated mostly from stage and item progress:
-
-- **Mastered** and **Review Soon** items count fully toward the score.
-- Started but not-yet-mastered items count partially.
-- Accuracy and speed from the completed round add a small progress-based bonus.
-
-This means the score can move forward even while items are still yellow or light green. The student does not have to wait for every item to turn green before seeing improvement.
-
-After each round, a one-sentence note explains why the score went up, held steady, or dipped.
-
-The progress graph shows the most recent 10 quiz results by default. The Show all results button changes the graph to all saved quiz results. The scorecard above the graph shows the current mastery score plus the average items/min and accuracy for whichever results are currently visible.
-
----
-
-### Daily practice goal
-
-The app tracks how many rounds a student completes each day. The daily goal is **5 rounds**. The practice header shows "Today: X of 5" and turns green when the goal is reached. Five rounds takes roughly 5 minutes and is enough to meaningfully move items forward.
-
----
-
-### The full journey
-
-| Stage | What the student experiences |
-|---|---|
-| First session | Anchor facts are introduced gradually. "New fact!" appears the first time an item is shown. |
-| Early practice | Items appear often. Correct answers raise confidence. Wrong answers or timeouts bring items back quickly. |
-| Building fluency | Items start turning yellow, then light green as confidence and speed improve. |
-| Mastery | Items turn dark green. Some may show as Review Soon when they need a little extra review. |
-| Cluster unlocks | New clusters open inside the current stage when the student shows readiness. |
-| Stage graduation | Enough stage progress triggers a move to the next stage, with a level-up message and confetti. |
-| Long-term | All six stages are worked through, from anchor facts to two-digit mental math methods. The mastery score climbs toward 100. |
-
-## Deployment notes for copies
-
-If you deploy your own copy of NumberFlow, update the Google OAuth client ID in `index.html` before publishing.
-
-1. Open Google Cloud Console.
-2. Create or select a project.
-3. Enable the Google Drive API.
-4. Configure the OAuth consent screen.
-5. Create an OAuth 2.0 Client ID for a Web application.
-6. Add your exact site URL under Authorized JavaScript origins. For GitHub Pages, this usually looks like `https://YOUR-USERNAME.github.io`.
-7. Replace `GOOGLE_CLIENT_ID` in `index.html` with your own OAuth client ID.
-
-NumberFlow uses Google Drive `appDataFolder` storage. This keeps the progress file separate from the student's normal visible Google Drive files.
-
-## Teacher settings
-
-Teacher-facing settings are intentionally kept in code rather than behind a password panel. To adjust defaults, edit the `APP_SETTINGS` object in `index.html`. Be careful to preserve valid JavaScript syntax when changing values.
-
-Useful defaults in the current file include:
-
-| Setting | Current value |
-|---|---:|
-| Round length | 60 seconds |
-| Timeout | 12 seconds |
-| Review mix | 30% |
-| Default speed target | 10 items/min |
-| Daily round goal | 5 rounds |
-
-Other classroom defaults, such as requiring Google sign-in, shared-device behavior, starting stage, maximum stage, speed target options, and mastery thresholds, are also set in code.
-
-## One-device-at-a-time recommendation
-
-Students should not practice on two devices at the same time using the same Google account. NumberFlow can merge progress across devices, but simultaneous active practice may cause confusing score changes or over-counted attempts.
-
-## Static files
-
-The app is self-contained in one main HTML file, but the favicon and Apple touch icon PNG files should stay in the same folder as `index.html`. If the final celebration video is used, keep `celebration.mp4` beside `index.html` as well.
+For classroom use, this makes the app simple to open and practice. The trade-off is that progress is local to the browser. If long-term cross-device records are required, sync would need to be added separately.
 
 ## File structure
 
-Typical deployment filename:
+The distributed rebuild includes a ready-to-open production build and the editable source.
+
+```text
+index.html                  Production entry file
+assets/                     Built CSS and JavaScript assets
+source/                     Editable React/Vite project
+source/src/App.tsx          Main app UI and game flow
+source/src/strategies.ts    Stages, strategies, and question generation
+source/src/adaptiveEngine.ts Adaptive fact tracking and mastery logic
+source/src/index.css        App CSS
+source/package.json         Development scripts and dependencies
+README_OPEN_FIRST.txt       Quick start notes for the packaged build
+```
+
+## Running the packaged app
+
+Open the top-level file:
 
 ```text
 index.html
 ```
 
-Development filename:
+The top-level `index.html` is the production build. It can be opened directly from the extracted folder because the asset paths are relative.
 
-```text
-numberflow.html
-```
-
-No build tooling is required.
-
-## Storage details
-
-Important local storage keys and prefixes:
-
-| Key or prefix | Purpose |
-|---|---|
-| `numberflow-progress-` | Signed-in user progress key prefix |
-| `numberflow-settings` | Teacher settings saved in the browser |
-| `numberflow-theme-pref` | Light, dark, or system appearance preference |
-| `numberflow-haptics-enabled` | Mobile haptic feedback preference |
-| `numberflow-current-session-progress` | Working progress while a Google practice session is active |
-| `numberflow-device-id` | Local sync device identifier |
-| `numberflow-sync-enabled-before` | Remembered Google sync intent used for silent sign-in restoration |
-| `numberflow-google-token-session` | Short-lived access token cache for the current browser tab/session |
-| `numberflow-google-user-cache` | Cached Google user display info, cleared on sign-out |
-
-
-### Google auth persistence
-
-NumberFlow does not use a backend app session or custom cookies. The app is a static client that uses Google Identity Services for OAuth access tokens and Google Drive app data sync.
-
-After a successful sign-in, the app remembers that Google sync was enabled. On refresh or browser restart, it first restores any still-valid in-tab token, then silently asks Google Identity Services for a fresh access token when Google still has an active account session and prior Drive consent. Normal Drive API calls also refresh an expired token and retry once before showing a reconnect message. The remembered sync state is cleared only when the user signs out or resets progress in a way that signs out.
-
-Drive filename:
-
-```text
-numberflow_data.json
-```
+Keep the `assets/` folder beside `index.html`. If the assets folder is moved or renamed, the app will not load correctly.
 
 ## Local development
 
-Open `numberflow.html` directly in a browser for basic local testing. The app interface can load locally, but Google sign-in and Drive sync require a correctly configured OAuth client and authorized origin.
+Prerequisites:
 
-To test with a local server:
+- Node.js
+- npm
+
+From the project root:
 
 ```bash
-python -m http.server 8000
+cd source
+npm install
+npm run dev
 ```
 
-Then open:
+Then open the local Vite URL shown in the terminal.
+
+To check TypeScript:
+
+```bash
+npm run lint
+```
+
+To rebuild the production files:
+
+```bash
+npm run build
+```
+
+The current Vite configuration uses relative asset paths, so the rebuilt files can be copied into the package root for local static use.
+
+## Deployment
+
+For simple static hosting, deploy the production build files:
 
 ```text
-http://localhost:8000/numberflow.html
+index.html
+assets/
 ```
+
+For GitHub Pages, Netlify, Cloudflare Pages, or similar static hosts, make sure the built `assets/` folder stays beside `index.html`.
+
+No OAuth setup, Google Cloud project, Google Drive API, backend server, or database is required for the rebuilt app.
 
 ## Testing checklist
 
 After changing the app, test:
 
-- Google sign-in before practice
-- Starting and finishing a round
-- Correct answers, incorrect answers, and timeouts
-- Speed target settings from 10 to 30 items per minute
-- Next Up practice queue updates
-- Stage Map color changes
-- Sub-stage or cluster unlock confetti
-- Main-stage graduation confetti
-- Daily goal display: Today X of 5
-- Streak, best streak, speed, and best-speed displays
-- Progress graph recent/all-results toggle
-- Local progress behavior after refresh
-- Google Drive sync, sync now, sign-out, and reset-progress options
-- Mobile layout during active rounds
-- Optional haptic feedback on supported mobile devices
-- Final completion celebration if all stages are complete
+- Opening the top-level `index.html` after extracting the package
+- Adventure Map stage display
+- All Lessons strategy slide display
+- Starting a 1-minute sprint from an unlocked stop
+- Correct answer handling
+- Incorrect answer handling
+- On-screen keypad input
+- Keyboard input, including Enter and Backspace
+- Timer countdown and sprint completion
+- Speed Score and accuracy display
+- Fact Readiness Check labels and numbers
+- Bronze, silver, and gold star rewards
+- Strategy stop unlocking
+- Best speed and best streak updates
+- Speed target settings: 10, 15, 20, 30, and 40 correct/min
+- Progress persistence after refreshing the page
+- Reset progress from the settings menu
+- Stage completion certificate printing
+- Full journey completion certificate printing
+- Mobile and tablet layout during active practice
+
+## Notes for future improvements
+
+Possible future additions:
+
+- Teacher dashboard or exportable progress summary
+- Class roster support
+- Optional cloud sync
+- More detailed teacher settings panel
+- Separate student profiles on shared classroom devices
+- More print-friendly progress reports
 
 ## License
 
