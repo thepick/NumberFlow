@@ -930,20 +930,6 @@ export default function App() {
             All {STRATEGIES.length} Math Lessons ({viewedStrategyIds.length}/{STRATEGIES.length})
           </button>
 
-          {activeStrategyRound && (
-            <button
-              id="tab-practice"
-              onClick={() => setActiveTab("practice")}
-              className={`px-4 py-2.5 rounded-2xl text-xs md:text-sm font-black transition-all flex items-center gap-2 ml-auto cursor-pointer ${
-                activeTab === "practice" 
-                  ? "bg-[#FF4757] text-white shadow-[0_4px_0px_0px_#B33939] border-2 border-[#FF2233]"
-                  : "bg-white hover:bg-blue-50 text-[#FF4757] border-2 border-red-200 hover:border-red-300"
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping inline-block" />
-              Active Math Arena
-            </button>
-          )}
         </div>
       </div>
 
@@ -1894,59 +1880,62 @@ export default function App() {
 
                   <div className="space-y-2">
                     <h3 className="text-2xl md:text-3xl font-display font-black text-blue-950">
-                      Sprint Complete! ⏱️
+                      1-Minute Sprint Complete! ⏱️
                     </h3>
                     <p className="text-sm text-slate-650 font-extrabold max-w-sm mx-auto leading-relaxed">
-                      Fantastic quick calculations! You solved multiple facts under 1 minute for <strong className="text-blue-600 font-black">{activeStrategyRound.name}</strong>!
+                      Nice work! You finished a 1-minute sprint for <strong className="text-blue-600 font-black">{activeStrategyRound.name}</strong>. Check your speed, accuracy, and fact readiness below.
                     </p>
                   </div>
 
                   {/* score badge summary */}
                   <div className="bg-yellow-50 p-6 rounded-[32px] border-4 border-yellow-300 inline-block shadow-[0_4px_0px_0px_#FDE047]">
-                    <span className="text-xs text-[#FF4757] uppercase tracking-widest block mb-1 font-black font-semibold">Facts Correct This Sprint</span>
-                    <span className="text-4xl font-mono font-black text-blue-950">{roundScore} correct / min</span>
+                    <span className="text-xs text-[#FF4757] uppercase tracking-widest block mb-1 font-black font-semibold">Speed Score</span>
+                    <span className="text-4xl font-mono font-black text-blue-950">{roundScore} correct in 1 min</span>
                     <span className="block text-xs text-slate-500 font-black mt-1">{roundAccuracyPercent}% accuracy</span>
                     
                     <div className="mt-4 pt-3 border-t border-yellow-250 text-xs text-blue-950 font-black space-y-1">
                       {roundScore >= speedTarget ? (
-                        <p className="text-amber-600 font-black text-sm">🏆 GOLD MASTER SPEED reached! Earned 3 gold stars! 🏆</p>
+                        <p className="text-amber-600 font-black text-sm">🏆 Gold speed reached! You earned 3 gold stars! 🏆</p>
                       ) : roundScore >= Math.max(6, Math.round(speedTarget * 0.6)) ? (
-                        <p className="text-slate-700 font-black text-sm">🥈 SILVER SPEED target achieved! Earned 2 stars! 🥈</p>
+                        <p className="text-slate-700 font-black text-sm">🥈 Silver speed reached! You earned 2 stars! 🥈</p>
                       ) : roundScore >= Math.max(3, Math.round(speedTarget * 0.3)) ? (
-                        <p className="text-amber-800 font-semibold">🥉 BRONZE SPEED passed! Earned 1 star! 🥉</p>
+                        <p className="text-amber-800 font-semibold">🥉 Bronze speed reached! You earned 1 star! 🥉</p>
                       ) : (
                         <p className="text-slate-500 font-bold max-w-xs mx-auto leading-snug">
-                          🌿 Great effort! Practice again to answer at least {Math.max(3, Math.round(speedTarget * 0.3))} correct facts to pass bronze speed milestones, earn stars, and unlock the next Kingdoms!
+                          🌿 Great effort! Practice again to answer at least {Math.max(3, Math.round(speedTarget * 0.3))} correct facts in 1 minute. That reaches bronze speed, earns stars, and helps unlock more kingdom stops.
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="bg-blue-50/70 border-2 border-blue-100 p-4 rounded-2xl max-w-md mx-auto text-left space-y-2">
+                  <div className="bg-blue-50/70 border-2 border-blue-100 p-4 rounded-2xl max-w-lg mx-auto text-left space-y-2">
                     <span className="text-[10px] text-blue-700 font-black font-mono uppercase tracking-widest block">
-                      Adaptive Mastery Check
+                      Fact Readiness Check
                     </span>
+                    <p className="text-xs text-slate-600 font-bold leading-snug">
+                      Ready facts are marked Review Soon or Fluent. Tried so far shows how many different facts have appeared at least once.
+                    </p>
                     <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-black">
                       <div className="bg-white border border-blue-100 rounded-xl p-2">
                         <span className="block text-blue-900 text-base">{currentMasterySummary.fluentOrReview}/{currentMasterySummary.total}</span>
-                        <span className="text-slate-500">Fluent/Review</span>
+                        <span className="text-slate-500">Ready facts</span>
                       </div>
                       <div className="bg-white border border-rose-100 rounded-xl p-2">
                         <span className="block text-rose-600 text-base">{currentMasterySummary.struggling}</span>
-                        <span className="text-slate-500">Struggling</span>
+                        <span className="text-slate-500">Need practice</span>
                       </div>
                       <div className="bg-white border border-emerald-100 rounded-xl p-2">
                         <span className="block text-emerald-700 text-base">{currentMasterySummary.seen}</span>
-                        <span className="text-slate-500">Seen</span>
+                        <span className="text-slate-500">Tried so far</span>
                       </div>
                     </div>
                     {currentMasterySummary.isMastered ? (
                       <p className="text-xs text-emerald-700 font-black leading-relaxed">
-                        Adaptive mastery reached! This stop can unlock the next lesson because speed, accuracy, and fact confidence are strong enough.
+                        Ready to unlock! You met the speed goal, kept accuracy high, and enough facts are now ready for review.
                       </p>
                     ) : (
                       <p className="text-xs text-slate-600 font-bold leading-relaxed">
-                        Keep practicing to unlock the next stop. Mastery needs bronze speed, at least 80% accuracy, and most facts in Review Soon or Fluent.
+                        Not ready to unlock yet. Your sprint score can be strong, but this check also needs most facts to become ready. Keep practicing until more facts move from Need Practice into Ready Facts.
                       </p>
                     )}
                   </div>
