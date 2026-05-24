@@ -343,10 +343,18 @@ Important local storage keys and prefixes:
 | `numberflow-settings` | Teacher settings saved in the browser |
 | `numberflow-theme-pref` | Light, dark, or system appearance preference |
 | `numberflow-haptics-enabled` | Mobile haptic feedback preference |
-| `numberflow-current-session-progress` | Working progress during the signed-in session |
+| `numberflow-current-session-progress` | Working progress while a Google practice session is active |
 | `numberflow-device-id` | Local sync device identifier |
-| `numberflow-google-token-session` | Session token cache for Google sync |
-| `numberflow-google-user-cache` | Cached Google user display info |
+| `numberflow-sync-enabled-before` | Remembered Google sync intent used for silent sign-in restoration |
+| `numberflow-google-token-session` | Short-lived access token cache for the current browser tab/session |
+| `numberflow-google-user-cache` | Cached Google user display info, cleared on sign-out |
+
+
+### Google auth persistence
+
+NumberFlow does not use a backend app session or custom cookies. The app is a static client that uses Google Identity Services for OAuth access tokens and Google Drive app data sync.
+
+After a successful sign-in, the app remembers that Google sync was enabled. On refresh or browser restart, it first restores any still-valid in-tab token, then silently asks Google Identity Services for a fresh access token when Google still has an active account session and prior Drive consent. Normal Drive API calls also refresh an expired token and retry once before showing a reconnect message. The remembered sync state is cleared only when the user signs out or resets progress in a way that signs out.
 
 Drive filename:
 

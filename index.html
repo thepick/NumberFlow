@@ -1933,6 +1933,8 @@
     var SYNC_BEFORE_ROUND_MAX_AGE_MS = 10000;
     var SYNC_CLOUD_DEBOUNCE_MS = 2500;
     var GOOGLE_AUTH_MAX_INIT_ATTEMPTS = 20;
+    var GOOGLE_TOKEN_REFRESH_TIMEOUT_MS = 15000;
+
 
     // Local sync metadata keys.
     var LOCAL_DEVICE_ID_KEY = 'numberflow-device-id';
@@ -2235,6 +2237,7 @@ var state = {
       deferSyncUntilRoundEnds: false,
       permissionRetryAttempted: false,
       tokenRefreshInFlight: false,
+      tokenRefreshPromise: null,
       lastTokenScope: ''
     };
 
@@ -3244,23 +3247,28 @@ var state = {
 
     // ═══════════════════════════ SYNC STATUS ═══════════════════════════
     function getCachedGoogleUser() {
-      var store;
+      var raw;
       try {
-        store = SHARED_DEVICE_MODE ? sessionStorage : localStorage;
-        var raw = store.getItem(GOOGLE_USER_CACHE_KEY);
+        raw = localStorage.getItem(GOOGLE_USER_CACHE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+
+      try {
+        raw = sessionStorage.getItem(GOOGLE_USER_CACHE_KEY);
         return raw ? JSON.parse(raw) : null;
-      } catch (e) {
+      } catch (e2) {
         return null;
       }
     }
 
     function cacheGoogleUser(info) {
-      var store;
       if (!info) return;
       try {
-        store = SHARED_DEVICE_MODE ? sessionStorage : localStorage;
-        store.setItem(GOOGLE_USER_CACHE_KEY, JSON.stringify(info));
+        localStorage.setItem(GOOGLE_USER_CACHE_KEY, JSON.stringify(info));
       } catch (e) {}
+      try {
+        sessionStorage.setItem(GOOGLE_USER_CACHE_KEY, JSON.stringify(info));
+      } catch (e2) {}
     }
 
     function clearCachedGoogleUser() {
@@ -3478,44 +3486,99 @@ var state = {
     }
 
     // ═══════════════════════════ GOOGLE AUTH ═══════════════════════════
+    function getStoredTokenSession() {
+      var raw;
+      var saved;
+      try {
+        raw = sessionStorage.getItem(SYNC_TOKEN_SESSION_KEY);
+      } catch (e) {
+        raw = null;
+      }
+
+      if (!raw) return null;
+
+      try {
+        saved = JSON.parse(raw);
+      } catch (e2) {
+        return null;
+      }
+
+      if (!saved || !saved.accessToken || !saved.tokenExpiresAt) return null;
+      if (nowMs() >= saved.tokenExpiresAt) return null;
+      return saved;
+    }
+
+    function hasStoredTokenSession() {
+      return !!getStoredTokenSession();
+    }
+
     function saveTokenSession(tokenResponse) {
+      var tokenExpiresAt;
       try {
         if (!tokenResponse || !tokenResponse.access_token) return;
+        tokenExpiresAt = nowMs() + ((tokenResponse.expires_in || 3600) - 60) * 1000;
         sessionStorage.setItem(SYNC_TOKEN_SESSION_KEY, JSON.stringify({
           accessToken: tokenResponse.access_token,
-          tokenExpiresAt: nowMs() + ((tokenResponse.expires_in || 3600) - 60) * 1000
+          tokenExpiresAt: tokenExpiresAt
         }));
       } catch (e) {}
     }
 
     function restoreTokenSession() {
-      try {
-        var raw = sessionStorage.getItem(SYNC_TOKEN_SESSION_KEY);
-        if (!raw) return false;
-
-        var saved = JSON.parse(raw);
-        if (!saved || !saved.accessToken || !saved.tokenExpiresAt) return false;
-        if (nowMs() >= saved.tokenExpiresAt) {
-          sessionStorage.removeItem(SYNC_TOKEN_SESSION_KEY);
-          return false;
-        }
-
-        syncState.accessToken = saved.accessToken;
-        syncState.tokenExpiresAt = saved.tokenExpiresAt;
-        syncState.signedIn = true;
-        syncState.driveVerified = false;
-        syncState.googleUser = getCachedGoogleUser();
-        syncState.lastError = null;
-        return true;
-      } catch (e) {
+      var saved = getStoredTokenSession();
+      if (!saved) {
+        clearTokenSession();
         return false;
       }
+
+      syncState.accessToken = saved.accessToken;
+      syncState.tokenExpiresAt = saved.tokenExpiresAt;
+      syncState.signedIn = true;
+      syncState.driveVerified = false;
+      syncState.googleUser = getCachedGoogleUser();
+      syncState.lastError = null;
+      return true;
     }
 
     function clearTokenSession() {
       try {
         sessionStorage.removeItem(SYNC_TOKEN_SESSION_KEY);
       } catch (e) {}
+    }
+
+    function resetSignedInStateAfterAuthFailure() {
+      syncState.signedIn = false;
+      syncState.driveVerified = false;
+      syncState.accessToken = null;
+      syncState.tokenExpiresAt = 0;
+      syncState.isSyncing = false;
+      syncState.tokenRefreshInFlight = false;
+      syncState.tokenRefreshPromise = null;
+      sessionMode = 'signed-out';
+      clearTokenSession();
+    }
+
+    function restoreGoogleSessionSilently() {
+      if (!hasSyncEnabledBefore() || !syncState.tokenClient) return Promise.resolve(false);
+
+      syncState.googleUser = getCachedGoogleUser();
+      setPracticeLocked(true, 'Restoring your Google sign-in...');
+      setSyncStatus('syncing', 'Restoring Google sign-in...');
+
+      return requestGoogleTokenRefresh('')
+        .then(function () {
+          syncState.driveVerified = true;
+          onGoogleSignedIn();
+          return true;
+        })
+        .catch(function (e) {
+          syncState.lastError = e;
+          handleSyncBlockState(e);
+          resetSignedInStateAfterAuthFailure();
+          setPracticeLocked(true, 'Tap Google sign-in to reconnect.');
+          setSyncStatus('local', 'Tap Google sign-in to reconnect');
+          return false;
+        });
     }
 
     function initGoogleAuth(attempt) {
@@ -3589,14 +3652,12 @@ var state = {
               handleSyncBlockState(e);
               syncState.driveVerified = false;
               if (shouldClearSessionForError(e)) {
-                syncState.signedIn = false;
-                clearTokenSession();
+                resetSignedInStateAfterAuthFailure();
               }
-              setSyncStatus('error', getSyncErrorMessage(e));
+              restoreGoogleSessionSilently();
             });
         } else {
-          // No valid token in sessionStorage — wait for manual sign-in.
-          setSyncStatus('local', 'Sign in to sync');
+          restoreGoogleSessionSilently();
         }
       }
     }
@@ -3658,27 +3719,33 @@ var state = {
 
     function requestGoogleTokenRefresh(promptValue) {
       if (!syncState.tokenClient) return Promise.reject(new Error('Google auth is not ready'));
-      if (syncState.tokenRefreshInFlight) return Promise.reject(new Error('TOKEN_REFRESH_IN_PROGRESS'));
+      if (syncState.tokenRefreshInFlight && syncState.tokenRefreshPromise) return syncState.tokenRefreshPromise;
 
       syncState.tokenRefreshInFlight = true;
 
-      return new Promise(function (resolve, reject) {
+      syncState.tokenRefreshPromise = new Promise(function (resolve, reject) {
         var oldCallback = syncState.tokenClient.callback;
         var finished = false;
         var timeoutId = setTimeout(function () {
           if (finished) return;
           finished = true;
           syncState.tokenRefreshInFlight = false;
+          syncState.tokenRefreshPromise = null;
           syncState.tokenClient.callback = oldCallback;
           reject(new Error('Token refresh timed out'));
-        }, 15000);
+        }, GOOGLE_TOKEN_REFRESH_TIMEOUT_MS);
 
-        syncState.tokenClient.callback = function (tokenResponse) {
-          if (finished) return;
+        function finish() {
           finished = true;
           clearTimeout(timeoutId);
           syncState.tokenRefreshInFlight = false;
+          syncState.tokenRefreshPromise = null;
           syncState.tokenClient.callback = oldCallback;
+        }
+
+        syncState.tokenClient.callback = function (tokenResponse) {
+          if (finished) return;
+          finish();
           if (!tokenResponse || tokenResponse.error) {
             reject(new Error(tokenResponse && tokenResponse.error ? tokenResponse.error : 'Token refresh failed'));
             return;
@@ -3702,14 +3769,13 @@ var state = {
           syncState.tokenClient.requestAccessToken({ prompt: typeof promptValue === 'string' ? promptValue : '' });
         } catch (e) {
           if (!finished) {
-            finished = true;
-            clearTimeout(timeoutId);
-            syncState.tokenRefreshInFlight = false;
-            syncState.tokenClient.callback = oldCallback;
+            finish();
             reject(e);
           }
         }
       });
+
+      return syncState.tokenRefreshPromise;
     }
 
     function handleTokenResponse(tokenResponse) {
@@ -4059,6 +4125,7 @@ var state = {
       syncState.permissionBlocked = false;
       syncState.permissionRetryAttempted = false;
       syncState.tokenRefreshInFlight = false;
+      syncState.tokenRefreshPromise = null;
       syncState.needsSyncAfterCurrent = false;
       syncState.lastSyncedLocalHash = '';
       syncState.lastPollAt = 0;
@@ -4082,7 +4149,19 @@ var state = {
 
     // ═══════════════════════════ DRIVE FETCH ═══════════════════════════
     function isAuthError(e) {
-      return e && (e.status === 401 || e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN');
+      var message = '';
+      if (!e) return false;
+      if (e.status === 401 || e.message === 'TOKEN_EXPIRED' || e.message === 'NO_TOKEN') return true;
+      if (e.message) message += String(e.message).toLowerCase() + ' ';
+      if (e.error) message += String(e.error).toLowerCase() + ' ';
+      return !!(
+        message.indexOf('token') !== -1 ||
+        message.indexOf('expired') !== -1 ||
+        message.indexOf('invalid_grant') !== -1 ||
+        message.indexOf('login_required') !== -1 ||
+        message.indexOf('interaction_required') !== -1 ||
+        message.indexOf('consent_required') !== -1
+      );
     }
 
     function isPermissionError(e) {
@@ -4137,8 +4216,51 @@ var state = {
       return err;
     }
 
+    function cloneDriveFetchOptions(options, retrying) {
+      var cloned = {};
+      var key;
+      var source = options || {};
+
+      for (key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key) && key !== '_googleAuthRetry') {
+          cloned[key] = source[key];
+        }
+      }
+
+      cloned.headers = {};
+      if (source.headers) {
+        for (key in source.headers) {
+          if (Object.prototype.hasOwnProperty.call(source.headers, key)) {
+            cloned.headers[key] = source.headers[key];
+          }
+        }
+      }
+      cloned._googleAuthRetry = retrying === true;
+      return cloned;
+    }
+
+    function driveFetchWithCurrentToken(url, options) {
+      options.headers = options.headers || {};
+      options.headers.Authorization = 'Bearer ' + syncState.accessToken;
+
+      console.log('[NumberFlow Sync] driveFetch', { method: options.method || 'GET', url: url.replace(/\?.*/, '?…').substring(0, 80), retry: !!options._googleAuthRetry });
+
+      return fetch(url, options).then(function (r) {
+        console.log('[NumberFlow Sync] Drive API response', { url: url.replace(/\?.*/, '?…').substring(0, 80), status: r.status, ok: r.ok });
+        return r;
+      });
+    }
+
+    function refreshGoogleTokenForDriveFetch() {
+      if (!syncState.tokenClient || !hasSyncEnabledBefore() || !navigator.onLine) {
+        return Promise.reject(new Error('TOKEN_EXPIRED'));
+      }
+      setSyncStatus('syncing', 'Reconnecting Google sync...');
+      return requestGoogleTokenRefresh('');
+    }
+
     function driveFetch(url, options) {
-      options = options || {};
+      options = cloneDriveFetchOptions(options || {}, options && options._googleAuthRetry === true);
 
       if (url.indexOf('https://www.googleapis.com/') !== 0) {
         return Promise.reject(new Error('Blocked non-Google API URL'));
@@ -4146,17 +4268,23 @@ var state = {
 
       if (!isTokenValid()) {
         console.warn('[NumberFlow Sync] driveFetch: token invalid or expired');
-        return Promise.reject(new Error('TOKEN_EXPIRED'));
+        return refreshGoogleTokenForDriveFetch().then(function () {
+          return driveFetch(url, cloneDriveFetchOptions(options, true));
+        });
       }
 
-      options.headers = options.headers || {};
-      options.headers.Authorization = 'Bearer ' + syncState.accessToken;
+      return driveFetchWithCurrentToken(url, options).then(function (response) {
+        if (response.status !== 401 || options._googleAuthRetry) return response;
 
-      console.log('[NumberFlow Sync] driveFetch', { method: options.method || 'GET', url: url.replace(/\?.*/, '?…').substring(0, 80) });
-
-      return fetch(url, options).then(function (r) {
-        console.log('[NumberFlow Sync] Drive API response', { url: url.replace(/\?.*/, '?…').substring(0, 80), status: r.status, ok: r.ok });
-        return r;
+        console.warn('[NumberFlow Sync] driveFetch: Google returned 401; refreshing token and retrying once');
+        return refreshGoogleTokenForDriveFetch()
+          .then(function () {
+            return driveFetch(url, cloneDriveFetchOptions(options, true));
+          })
+          .catch(function (e) {
+            syncState.lastError = e;
+            throw e;
+          });
       });
     }
 
@@ -8733,16 +8861,21 @@ function chooseAllStageReviewItem(previousItem, progress) {
         applyFixedBarGradient(el.fpmFill, el.fpmFill && el.fpmFill.parentNode);
       });
 
-      // Shared-device mode: clear only student working progress on startup.
-      // Do not clear the Google token/session here; refresh should restore a valid token
-      // until it expires or the user explicitly signs out.
+      // Shared-device mode: clear legacy local-user progress, but keep the active
+      // Google session restore path intact across refreshes and browser restarts.
+      // Progress is cleared only when there is no remembered Google sync session.
       if (SHARED_DEVICE_MODE && REQUIRE_SIGN_IN_TO_PRACTICE) {
         clearLegacyLocalProgressKeys();
-        clearWorkingProgress();
         clearProgressMemory();
         sessionMode = 'signed-out';
-        setPracticeLocked(true, 'Sign in with Google to start.');
-        setSyncStatus('local', 'Sign in to start');
+        if (hasSyncEnabledBefore() || hasStoredTokenSession()) {
+          setPracticeLocked(true, 'Restoring your Google sign-in...');
+          setSyncStatus('syncing', 'Restoring Google sign-in...');
+        } else {
+          clearWorkingProgress();
+          setPracticeLocked(true, 'Sign in with Google to start.');
+          setSyncStatus('local', 'Sign in to start');
+        }
       }
 
       bindEvents();
