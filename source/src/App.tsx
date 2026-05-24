@@ -1035,23 +1035,23 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-3.5 sm:gap-6 w-full sm:w-auto">
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-6 w-full sm:w-auto">
             {/* Stars Meter */}
-            <div className="flex items-center gap-3.5 bg-[#fdfbe7] px-5 py-1.5 rounded-full border-[3px] border-[#fbcf22] shadow-xs select-none">
-              <Star className="w-6 h-6 text-yellow-500 fill-yellow-400 stroke-[2.5]" />
+            <div className="flex shrink-0 items-center gap-2.5 sm:gap-3.5 bg-[#fdfbe7] px-4 sm:px-5 py-1.5 rounded-full border-[3px] border-[#fbcf22] shadow-xs select-none">
+              <Star className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 fill-yellow-400 stroke-[2.5]" />
               <div className="flex flex-col text-right leading-none">
-                <span className="font-mono text-2xl font-black text-blue-950">{stars}</span>
-                <span className="text-[9px] font-black tracking-wider text-blue-700 uppercase mt-0.5 whitespace-nowrap">Stars Earned</span>
+                <span className="font-mono text-xl sm:text-2xl font-black text-blue-950">{stars}</span>
+                <span className="text-[8px] sm:text-[9px] font-black tracking-wider text-blue-700 uppercase mt-0.5 whitespace-nowrap">Stars Earned</span>
               </div>
             </div>
 
-            {/* Overall Stage Tracker */}
-            <div className="hidden md:flex flex-col w-36">
-              <div className="flex justify-between items-end text-[10px] uppercase tracking-wider text-blue-800 font-black mb-1">
-                <span>Journey Path</span>
-                <span className="font-mono font-black text-blue-900">{currentLevelProgressPercent}% Done</span>
+            {/* Overall Journey Tracker */}
+            <div className="flex min-w-0 flex-1 sm:flex-none flex-col max-w-[10rem] sm:w-36">
+              <div className="flex justify-between items-end gap-2 text-[8px] sm:text-[10px] uppercase tracking-wider text-blue-800 font-black mb-1">
+                <span className="truncate">Journey Path</span>
+                <span className="font-mono font-black text-blue-900 whitespace-nowrap">{currentLevelProgressPercent}%<span className="hidden sm:inline"> Done</span></span>
               </div>
-              <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden border-2 border-blue-200 shadow-inner">
+              <div className="w-full bg-blue-100 rounded-full h-2.5 sm:h-3 overflow-hidden border-2 border-blue-200 shadow-inner">
                 <div 
                   className="bg-yellow-400 h-full rounded-full transition-all duration-700"
                   style={{ width: `${currentLevelProgressPercent}%` }}
@@ -1063,7 +1063,7 @@ export default function App() {
             <button
               id="settings-gear-btn"
               onClick={() => setShowSettingsModal(true)}
-              className="bg-white hover:bg-slate-50 text-slate-700 p-2.5 rounded-full border-2 border-blue-200 hover:border-blue-300 transition-all cursor-pointer active:translate-y-0.5"
+              className="shrink-0 bg-white hover:bg-slate-50 text-slate-700 p-2.5 rounded-full border-2 border-blue-200 hover:border-blue-300 transition-all cursor-pointer active:translate-y-0.5"
               title="Adventure Settings"
             >
               <Settings className="w-5 h-5 text-blue-900 animate-hover-spin" />
