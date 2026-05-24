@@ -355,6 +355,8 @@ export default function App() {
   const currentStrategyFactsRef = useRef<MathQuestion[]>([]);
   const questionPoolRef = useRef<MathQuestion[]>([]);
   const confettiClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const correctFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incorrectFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // State elements
   const [currentStageId, setCurrentStageId] = useState<StageId>(StageId.StarterIsland);
   const [activeStrategyRound, setActiveStrategyRound] = useState<Strategy | null>(null);
@@ -446,6 +448,12 @@ export default function App() {
       countdownTimersRef.current.forEach((timerId) => clearTimeout(timerId));
       if (confettiClearTimerRef.current) {
         clearTimeout(confettiClearTimerRef.current);
+      }
+      if (correctFeedbackTimerRef.current) {
+        clearTimeout(correctFeedbackTimerRef.current);
+      }
+      if (incorrectFeedbackTimerRef.current) {
+        clearTimeout(incorrectFeedbackTimerRef.current);
       }
       document.body.classList.remove("timed-quiz-active");
       document.documentElement.classList.remove("timed-quiz-active");
@@ -673,6 +681,7 @@ export default function App() {
   };
 
   const resetTimedRoundCounters = () => {
+    clearAnswerFeedbackTimers();
     roundCompletedRef.current = false;
     answerLockedRef.current = false;
     const now = Date.now();
@@ -695,6 +704,10 @@ export default function App() {
     setBestStreakRound(0);
     setConsecutiveErrors(0);
     setSpamWarning(null);
+    setIsAnimatingCorrect(false);
+    setIsAnimatingIncorrect(false);
+    setIsShaking(false);
+    setSparklesList([]);
     setShowHint(false);
   };
 
@@ -766,8 +779,13 @@ export default function App() {
     attemptsSinceQuickReviewRef.current = 0;
     recentReviewFactIdsRef.current = [];
     setTimeLeft(60); // Reset timer to 1 minute (60 seconds)
+    clearAnswerFeedbackTimers();
     setConsecutiveErrors(0);
     setSpamWarning(null);
+    setIsAnimatingCorrect(false);
+    setIsAnimatingIncorrect(false);
+    setIsShaking(false);
+    setSparklesList([]);
     setEncouragingText("Type fast and stay focused! Let's go! 🚀");
     
     // Reset round states
@@ -867,9 +885,20 @@ export default function App() {
     }
   }, [roundCompleted]);
 
+  const clearAnswerFeedbackTimers = () => {
+    if (correctFeedbackTimerRef.current) {
+      clearTimeout(correctFeedbackTimerRef.current);
+      correctFeedbackTimerRef.current = null;
+    }
+    if (incorrectFeedbackTimerRef.current) {
+      clearTimeout(incorrectFeedbackTimerRef.current);
+      incorrectFeedbackTimerRef.current = null;
+    }
+  };
+
   // Number Pad Click support
   const handleNumClick = (val: string) => {
-    if (!isRoundActive) return; // Do not allow typing before round starts
+    if (!isRoundActive || answerLockedRef.current || roundCompletedRef.current) return; // Do not allow typing before round starts or during feedback
     if (val === "DELETE") {
       setUserAnswer((prev) => prev.slice(0, -1));
     } else if (val === "CLEAR") {
@@ -886,9 +915,13 @@ export default function App() {
     answerLockedRef.current = true;
     const updatedStats = recordFactAttempt(true);
 
+    clearAnswerFeedbackTimers();
+    setIsAnimatingIncorrect(false);
+    setIsShaking(false);
     setIsAnimatingCorrect(true);
+    setSparklesList([]);
     setRoundScore((prev) => prev + 1);
-    
+
     // Update streaks
     const nextStreak = currentStreak + 1;
     setCurrentStreak(nextStreak);
@@ -898,26 +931,23 @@ export default function App() {
 
     setConsecutiveErrors(0);
     setSpamWarning(null);
-    
-    const praises = ["Woohoo!", "Phenomenal!", "Correct!", "Super Star!", "Wow!", "High Five!", "Fantastic!"];
+
+    const praises = ["Nice!", "Correct!", "Yes!", "Great!", "Fast!", "Got it!", "Super!"];
     const randomPraise = praises[Math.floor(Math.random() * praises.length)];
     setEncouragingText(`${randomPraise} 🦊`);
 
-    const list = Array.from({ length: 12 }).map(() => ({
-      id: Math.random(),
-      x: (Math.random() - 0.5) * 160,
-      y: (Math.random() - 0.5) * 160,
-    }));
-    setSparklesList(list);
+    // Advance first. The quick green flash stays non-blocking so students can
+    // start processing the next fact immediately.
+    setUserAnswer("");
+    setShowHint(false);
+    advanceToNextQuestion(updatedStats);
+    answerLockedRef.current = false;
 
-    setTimeout(() => {
+    correctFeedbackTimerRef.current = setTimeout(() => {
       setIsAnimatingCorrect(false);
       setSparklesList([]);
-      setUserAnswer("");
-      setShowHint(false);
-      advanceToNextQuestion(updatedStats);
-      answerLockedRef.current = false;
-    }, 450);
+      correctFeedbackTimerRef.current = null;
+    }, 120);
   };
 
   const handleIncorrectAnswer = () => {
@@ -925,12 +955,14 @@ export default function App() {
     answerLockedRef.current = true;
     recordFactAttempt(false);
 
+    clearAnswerFeedbackTimers();
+    setIsAnimatingCorrect(false);
     setIsAnimatingIncorrect(true);
     setIsShaking(true);
-    
+
     // Reset streak on error
     setCurrentStreak(0);
-    
+
     setConsecutiveErrors((prev) => {
       const nextVal = prev + 1;
       if (nextVal >= 3) {
@@ -939,14 +971,15 @@ export default function App() {
       return nextVal;
     });
 
-    setTimeout(() => {
+    incorrectFeedbackTimerRef.current = setTimeout(() => {
       setIsAnimatingIncorrect(false);
       setIsShaking(false);
-      setUserAnswer(""); // Clear error immediately
+      setUserAnswer("");
       questionStartedAtRef.current = Date.now();
       setQuestionStartedAt(questionStartedAtRef.current);
       answerLockedRef.current = false;
-    }, 400);
+      incorrectFeedbackTimerRef.current = null;
+    }, 160);
   };
 
   // Keep mobile keyboards hidden during timed quizzes. Hardware keyboard input is handled below.
@@ -1029,7 +1062,7 @@ export default function App() {
 
   // Check manual entry
   const handleSubmitAnswer = () => {
-    if (!userAnswer.trim()) return;
+    if (answerLockedRef.current || roundCompletedRef.current || !userAnswer.trim()) return;
     
     const parsedAns = parseInt(userAnswer, 10);
     const currentQ = currentQuestion;
@@ -1993,8 +2026,8 @@ export default function App() {
                       <motion.div 
                         onClick={() => inputRef.current?.blur()}
                         animate={isShaking ? { x: [-10, 10, -10, 10, -5, 5, 0] } : {}}
-                        transition={{ duration: 0.3 }}
-                        className={`timed-question-card text-center py-6 md:py-8 rounded-3xl border-4 transition-all duration-200 relative overflow-hidden select-none cursor-pointer ${
+                        transition={{ duration: 0.14 }}
+                        className={`timed-question-card text-center py-6 md:py-8 rounded-3xl border-4 transition-all duration-75 relative overflow-hidden select-none cursor-pointer ${
                           isAnimatingCorrect 
                             ? "border-emerald-500 bg-emerald-50/10" 
                             : isShaking 
@@ -2008,22 +2041,20 @@ export default function App() {
 
                         {/* Centered Question Formula */}
                         <div className="relative z-10 py-2">
-                          <AnimatePresence mode="wait">
-                            <motion.h4 
-                              key={currentQuestionIdx}
-                              initial={{ opacity: 0, scale: 0.96 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 1.04 }}
-                              className="text-5xl md:text-7xl font-sans font-extrabold tracking-tight text-slate-800"
-                            >
-                              {currentQuestion?.question}
-                            </motion.h4>
-                          </AnimatePresence>
+                          <motion.h4
+                            key={currentQuestionIdx}
+                            initial={{ opacity: 0.85, scale: 0.99 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.06 }}
+                            className="text-5xl md:text-7xl font-sans font-extrabold tracking-tight text-slate-800"
+                          >
+                            {currentQuestion?.question}
+                          </motion.h4>
                         </div>
 
                         {/* Active Central Blue Input Box */}
                         <div className="mt-2.5 relative z-10">
-                          <div className={`border-4 bg-white rounded-2xl w-44 h-16 flex items-center justify-center mx-auto text-3xl font-extrabold font-mono transition shadow-inner select-none ${
+                          <div className={`border-4 bg-white rounded-2xl w-44 h-16 flex items-center justify-center mx-auto text-3xl font-extrabold font-mono transition duration-75 shadow-inner select-none ${
                             isAnimatingCorrect 
                               ? "border-emerald-500 text-emerald-600 scale-102"
                               : isShaking 
@@ -2040,12 +2071,12 @@ export default function App() {
 
                         {/* Subtle flash text messages */}
                         {isAnimatingCorrect && (
-                          <div className="absolute top-2 right-4 text-xs font-black text-emerald-600 uppercase tracking-wider animate-bounce">
+                          <div className="absolute top-2 right-4 text-xs font-black text-emerald-600 uppercase tracking-wider">
                             Correct! ✨
                           </div>
                         )}
                         {isShaking && (
-                          <div className="absolute top-2 right-4 text-xs font-black text-rose-600 uppercase tracking-rider animate-pulse">
+                          <div className="absolute top-2 right-4 text-xs font-black text-rose-600 uppercase tracking-wider">
                             Let's try again! ☄️
                           </div>
                         )}
