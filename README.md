@@ -43,8 +43,8 @@ Total: 25 lessons.
 ### Chapter 1: Starter Island
 
 1. Same Number Facts
-2. One More and One Less
-3. Two More and Two Less
+2. One More and One Fewer
+3. Two More and Two Fewer
 4. Make 10 Pairs
 5. Subtract from 10
 
