@@ -33,10 +33,27 @@
 }
 
 .timed-feedback-zone {
-  min-height: 3.1rem;
+  height: clamp(3.55rem, 7vh, 4.2rem);
+  min-height: clamp(3.55rem, 7vh, 4.2rem);
+  max-height: clamp(3.55rem, 7vh, 4.2rem);
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
+}
+
+.timed-feedback-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.timed-feedback-layer > * {
+  pointer-events: auto;
 }
 
 .timed-slow-down,
@@ -204,7 +221,9 @@ body.timed-quiz-active input {
     padding-bottom: 0.45rem !important;
   }
   .timed-feedback-zone {
-    min-height: 2.4rem;
+    height: 2.85rem;
+    min-height: 2.85rem;
+    max-height: 2.85rem;
   }
   .timed-slow-down,
   .timed-answer-reveal {

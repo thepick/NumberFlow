@@ -39,7 +39,7 @@ interface ConfettiPiece {
 const STARS_PER_STRATEGY = 3;
 const CORRECT_ANSWER_HOLD_MS = 275;
 const REVEALED_ANSWER_HOLD_MS = 225;
-const QUESTION_REVEAL_GRACE = 5;
+const QUESTION_REVEAL_GRACE = 3.75;
 const WRONG_BURST_WINDOW_MS = 9000;
 const WRONG_BURST_THRESHOLD = 2;
 const SLOW_DOWN_BANNER_MS = 1300;
@@ -1216,31 +1216,33 @@ export default function App() {
 
                       {/* Feedback */}
                       <div className="timed-feedback-zone" aria-live="polite">
-                        <AnimatePresence mode="wait">
-                          {answerReveal && (
-                            <motion.div
-                              key={`answer-reveal-${answerReveal.questionId}`}
-                              initial={{ opacity: 0, y: -6 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 6 }}
-                              className="timed-answer-reveal"
-                            >
-                              <div className="font-black">{answerReveal.text}</div>
-                              <div className="text-xs">Type the answer shown to continue</div>
-                            </motion.div>
-                          )}
-                          {!answerReveal && showSlowDown && (
-                            <motion.div
-                              key="slow-down"
-                              initial={{ opacity: 0, scale: 0.96 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.96 }}
-                              className="timed-slow-down"
-                            >
-                              Slow down! Read carefully
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <div className="timed-feedback-layer">
+                          <AnimatePresence mode="wait">
+                            {answerReveal && (
+                              <motion.div
+                                key={`answer-reveal-${answerReveal.questionId}`}
+                                initial={{ opacity: 0, y: -6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 6 }}
+                                className="timed-answer-reveal"
+                              >
+                                <div className="font-black">{answerReveal.text}</div>
+                                <div className="text-xs">Type the answer shown to continue</div>
+                              </motion.div>
+                            )}
+                            {!answerReveal && showSlowDown && (
+                              <motion.div
+                                key="slow-down"
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.96 }}
+                                className="timed-slow-down"
+                              >
+                                Slow down! Read carefully
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
 
                       {/* Keypad */}
