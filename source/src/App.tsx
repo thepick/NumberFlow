@@ -159,7 +159,7 @@ function printCertificate(
     .certificate-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
     .overlay{position:absolute;left:50%;transform:translateX(-50%);text-align:center;color:${theme.ink};text-shadow:0 2px 8px rgba(255,255,255,.64),0 1px 1px rgba(255,255,255,.8)}
     .top-brand{top:3.2mm;width:178mm;padding:1.5mm 8mm;border-radius:999mm;background:linear-gradient(90deg,rgba(12,34,80,.03),rgba(12,34,80,.84),rgba(12,34,80,.03));font-size:4.45mm;font-weight:900;letter-spacing:.24em;text-transform:uppercase;color:#fff5cf;text-shadow:0 1px 0 #68460b,0 3px 10px rgba(0,0,0,.58);z-index:4}
-    .chapter-medallion-icon{top:${theme.medallionTopMm}mm;width:28mm;height:28mm;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#fffdf2 0%,#fff3c4 46%,#f2ba37 100%);border:1.1mm solid #f7d279;box-shadow:0 0 0 .55mm rgba(92,64,20,.24),0 3mm 9mm rgba(0,0,0,.18);font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;font-size:15mm;line-height:1;z-index:3}
+    .chapter-medallion-icon{top:${theme.medallionTopMm + 3.15}mm;width:21.2mm;height:21.2mm;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#fffdfa 0%,#fff7df 68%,#f7efc7 100%);box-shadow:inset 0 0 0 .35mm rgba(255,255,255,.9);font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;font-size:12.4mm;line-height:1;z-index:3}
     .chapter-title{top:52mm;width:174mm;padding:2.1mm 8mm;border-radius:999mm;font-family:Georgia,'Times New Roman',serif;font-size:8.6mm;font-weight:900;line-height:1.1;color:#fff;background:linear-gradient(90deg,rgba(9,30,76,0),rgba(9,30,76,.88),rgba(9,30,76,0));text-shadow:0 2px 8px rgba(0,0,0,.52),0 1px 0 rgba(0,0,0,.42);z-index:2}
     .awarded-to{top:74mm;font-size:5.9mm;font-weight:800;color:${theme.ink}}
     .student-name{top:83mm;width:215mm;font-family:Georgia,'Times New Roman',serif;font-size:21mm;font-weight:900;line-height:1;color:${theme.ink};text-shadow:0 2px 0 #fff,0 5px 12px rgba(15,23,42,.2)}
@@ -167,7 +167,7 @@ function printCertificate(
     .stars-earned{top:108mm;font-size:7.2mm;font-weight:900;color:${theme.accent};text-shadow:0 2px 6px rgba(255,255,255,.7)}
     .star-row{top:119mm;display:flex;justify-content:center;gap:3.7mm;font-size:10.5mm;line-height:1}
     .star{color:rgba(255,255,255,.55);text-shadow:0 2px 6px rgba(0,0,0,.2)}.star.filled{color:#f4c533}.star.empty{color:rgba(255,255,255,.55)}
-    .date-field{bottom:14.4mm;width:86mm;font-family:Georgia,'Times New Roman',serif;font-size:5.7mm;font-weight:900;color:${theme.ink};text-shadow:0 1px 0 #fff,0 2px 7px rgba(255,255,255,.72)}
+    .date-field{bottom:14.7mm;width:86mm;height:10mm;display:flex;align-items:center;justify-content:center;font-family:Georgia,'Times New Roman',serif;font-size:5.7mm;font-weight:900;color:${theme.ink};text-shadow:0 1px 0 #fff,0 2px 7px rgba(255,255,255,.72)}
     @media print{html,body{width:297mm;height:210mm;background:#fff;padding:0}.certificate-page{width:297mm;height:210mm;box-shadow:none}}
   </style></head><body><div class="certificate-page">
     <img class="certificate-bg" src="${safeBackgroundUrl}" alt="">
@@ -1053,8 +1053,8 @@ export default function App() {
   const roundPassTarget = Math.max(6, Math.round(speedTarget * 0.6));
   const activeRoundBestStars = activeStrategyRound ? getStrategyStarCount(activeStrategyRound.id) : 0;
 
-  const renderStars = (count: number, cls = "w-4 h-4") =>
-    Array.from({ length: STARS_PER_STRATEGY }, (_, i) => (
+  const renderStars = (count: number, cls = "w-4 h-4", total = STARS_PER_STRATEGY) =>
+    Array.from({ length: total }, (_, i) => (
       <Star key={i} className={`${cls} ${i < count ? "text-yellow-500 fill-yellow-400" : "text-slate-300"}`} />
     ));
 
@@ -1590,7 +1590,7 @@ export default function App() {
 
               <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 mb-4 text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-1">
-                  {renderStars(Math.min(CERTIFICATE_STAR_SLOTS, certificateRequest.starsCount), "w-4 h-4")}
+                  {renderStars(Math.min(CERTIFICATE_STAR_SLOTS, certificateRequest.starsCount), "w-4 h-4", CERTIFICATE_STAR_SLOTS)}
                 </div>
                 <p className="text-sm font-black text-amber-700">
                   {certificateRequest.starsCount} Star{certificateRequest.starsCount === 1 ? "" : "s"} Earned
