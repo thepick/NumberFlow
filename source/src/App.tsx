@@ -57,39 +57,128 @@ const getStarsForScore = (score: number, target: number) => {
 
 // ─── Certificate Print ──────────────────────────────────
 
+const CERTIFICATE_STAR_SLOTS = 6;
+
+interface CertificateTheme {
+  background: string;
+  ink: string;
+  accent: string;
+}
+
+const CERTIFICATE_THEMES: { [key: number]: CertificateTheme } = {
+  [StageId.StarterIsland]: {
+    background: "certificates/starter-island.png",
+    ink: "#173a78",
+    accent: "#d97706",
+  },
+  [StageId.DoublesForest]: {
+    background: "certificates/doubles-forest.png",
+    ink: "#34511b",
+    accent: "#b37b0f",
+  },
+  [StageId.BridgeTown]: {
+    background: "certificates/bridge-town.png",
+    ink: "#174387",
+    accent: "#c47b12",
+  },
+  [StageId.FamilyVillage]: {
+    background: "certificates/family-village.png",
+    ink: "#5b2f7f",
+    accent: "#d97706",
+  },
+  [StageId.BigNumberMountain]: {
+    background: "certificates/big-number-mountain.png",
+    ink: "#7b2f54",
+    accent: "#c47b12",
+  },
+  [StageId.TheSummit]: {
+    background: "certificates/the-summit.png",
+    ink: "#173a78",
+    accent: "#b37b0f",
+  },
+};
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getAbsoluteCertificateAssetUrl(path: string): string {
+  return new URL(path, new URL("./", window.location.href)).href;
+}
+
+function getFilledCertificateStarSlots(starsCount: number, maxStarsCount: number): number {
+  if (maxStarsCount <= 0 || starsCount <= 0) return 0;
+  return Math.max(1, Math.min(CERTIFICATE_STAR_SLOTS, Math.round((starsCount / maxStarsCount) * CERTIFICATE_STAR_SLOTS)));
+}
+
+function makeCertificateStarRow(starsCount: number, maxStarsCount: number): string {
+  const filledSlots = getFilledCertificateStarSlots(starsCount, maxStarsCount);
+  return Array.from({ length: CERTIFICATE_STAR_SLOTS }, (_, i) => (
+    `<span class="star ${i < filledSlots ? "filled" : "empty"}">&#9733;</span>`
+  )).join("");
+}
+
 function printCertificate(
-  stageNum: number, stageName: string, emoji: string,
-  starsCount: number, userName: string,
+  stageNum: number, stageName: string,
+  starsCount: number, maxStarsCount: number, userName: string,
 ) {
   const w = window.open("", "_blank");
   if (!w) { alert("Please allow popups to print!"); return; }
+
+  const theme = CERTIFICATE_THEMES[stageNum] || CERTIFICATE_THEMES[StageId.StarterIsland];
+  const safeName = escapeHtml(userName.trim() || "Math Explorer");
+  const safeChapter = escapeHtml(`Chapter ${stageNum}: ${stageName}`);
+  const safeDate = escapeHtml(new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }));
+  const safeBackgroundUrl = escapeHtml(getAbsoluteCertificateAssetUrl(theme.background));
+  const safeStarsText = escapeHtml(`${starsCount} Star${starsCount === 1 ? "" : "s"} Earned`);
+  const starRow = makeCertificateStarRow(starsCount, maxStarsCount);
+  const nameClass = safeName.length > 20 ? " xsmall" : safeName.length > 14 ? " small" : "";
+
   w.document.write(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Certificate</title><style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800&family=Inter:wght@400;600;800&display=swap');
-    @page{size:A4 landscape;margin:0} body{margin:0;background:#f1f5f9;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .cert{width:297mm;height:210mm;box-sizing:border-box;background:#fff;border:22px solid #1e3a8a;padding:24px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;text-align:center}
-    .inner{border:4px solid #d97706;width:100%;height:100%;box-sizing:border-box;padding:24px 36px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;background:radial-gradient(circle,rgba(254,243,199,.12) 0%,#fff 85%)}
-    .org{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#475569;font-weight:800}
-    .emoji{font-size:64px;margin:4px 0 6px}
-    .title{font-size:20px;color:#0f172a;font-family:'Playfair Display',serif;font-weight:800;margin:4px 0}
-    .award{font-size:12px;color:#64748b;font-weight:600;margin:6px 0 2px}
-    .name{font-size:32px;color:#1e3a8a;font-family:'Playfair Display',serif;font-weight:800;margin:4px 0}
-    .chapter{font-size:14px;color:#d97706;font-weight:800;margin:6px 0}
-    .stars-row{display:flex;gap:6px;justify-content:center;margin:6px 0}
-    .stars-row span{font-size:28px}
-    .meta{font-size:10px;color:#94a3b8;font-weight:600}
-  </style></head><body><div class="cert"><div class="inner">
-    <div class="org">Mental Math Journey</div><div class="emoji">${emoji}</div>
-    <div>
-      <div class="title">Chapter ${stageNum}: ${stageName}</div>
-      <div class="award">Awarded to</div>
-      <div class="name">${userName || "Math Explorer"}</div>
-      <div class="chapter">${starsCount} Stars Earned</div>
-      <div class="stars-row">${Array.from({length:STARS_PER_STRATEGY},(_,i)=>i<starsCount?"⭐":"☆").join("")}</div>
-    </div>
-    <div class="meta">${new Date().toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"})}</div>
-  </div></div></body></html>`);
+    @page{size:A4 landscape;margin:0}
+    *{box-sizing:border-box}
+    html,body{width:100%;min-height:100%;margin:0;background:#eef2ff;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{display:flex;align-items:center;justify-content:center;padding:16px}
+    .certificate-page{position:relative;width:297mm;height:210mm;overflow:hidden;background:#fff;box-shadow:0 18px 48px rgba(15,23,42,.18)}
+    .certificate-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .overlay{position:absolute;left:50%;transform:translateX(-50%);text-align:center;color:${theme.ink};text-shadow:0 2px 8px rgba(255,255,255,.64),0 1px 1px rgba(255,255,255,.8)}
+    .top-brand{top:9mm;font-size:6.3mm;font-weight:900;letter-spacing:.24em;text-transform:uppercase}
+    .chapter-title{top:49mm;width:172mm;font-family:Georgia,'Times New Roman',serif;font-size:9.2mm;font-weight:800;line-height:1.1;color:#fff;text-shadow:0 2px 9px rgba(0,0,0,.28),0 1px 0 rgba(0,0,0,.3)}
+    .awarded-to{top:73mm;font-size:5.9mm;font-weight:800;color:${theme.ink}}
+    .student-name{top:82mm;width:215mm;font-family:Georgia,'Times New Roman',serif;font-size:21mm;font-weight:900;line-height:1;color:${theme.ink};text-shadow:0 2px 0 #fff,0 5px 12px rgba(15,23,42,.2)}
+    .student-name.small{font-size:17mm}.student-name.xsmall{font-size:14mm}
+    .stars-earned{top:107mm;font-size:7.2mm;font-weight:900;color:${theme.accent};text-shadow:0 2px 6px rgba(255,255,255,.7)}
+    .star-row{top:119mm;display:flex;justify-content:center;gap:3.7mm;font-size:10.5mm;line-height:1}
+    .star{color:rgba(255,255,255,.55);text-shadow:0 2px 6px rgba(0,0,0,.2)}.star.filled{color:#f4c533}.star.empty{color:rgba(255,255,255,.55)}
+    .date-field{bottom:6.2mm;width:92mm;font-family:Georgia,'Times New Roman',serif;font-size:6.8mm;font-weight:800;color:${theme.ink}}
+    @media print{html,body{width:297mm;height:210mm;background:#fff;padding:0}.certificate-page{width:297mm;height:210mm;box-shadow:none}}
+  </style></head><body><div class="certificate-page">
+    <img class="certificate-bg" src="${safeBackgroundUrl}" alt="">
+    <div class="overlay top-brand">MENTAL MATH JOURNEY</div>
+    <div class="overlay chapter-title">${safeChapter}</div>
+    <div class="overlay awarded-to">Awarded to</div>
+    <div class="overlay student-name${nameClass}">${safeName}</div>
+    <div class="overlay stars-earned">${safeStarsText}</div>
+    <div class="overlay star-row" aria-hidden="true">${starRow}</div>
+    <div class="overlay date-field">${safeDate}</div>
+  </div><script>
+    (function(){
+      function printReady(){ setTimeout(function(){ window.focus(); window.print(); }, 350); }
+      var imgs = Array.prototype.slice.call(document.images || []);
+      var imagePromise = Promise.all(imgs.map(function(img){
+        if (img.complete) return Promise.resolve();
+        return new Promise(function(resolve){ img.onload = resolve; img.onerror = resolve; });
+      }));
+      var fontPromise = document.fonts && document.fonts.ready ? document.fonts.ready.catch(function(){}) : Promise.resolve();
+      Promise.all([imagePromise, fontPromise]).then(printReady).catch(printReady);
+    }());
+  </script></body></html>`);
   w.document.close();
-  setTimeout(() => w.print(), 400);
 }
 
 // ─── App ────────────────────────────────────────────────
@@ -186,6 +275,10 @@ export default function App() {
   const chapterProgress = `${activeStrategies.filter((s) => masteredStrategyIds.includes(s.id)).length}/${activeStrategies.length}`;
 
   const getStrategyStarCount = (id: number) => clampStars(strategyStars[id] || 0);
+  const getStageEarnedStars = (stageId: StageId): number =>
+    STRATEGIES.filter((s) => s.stageId === stageId).reduce((total, strategy) => total + getStrategyStarCount(strategy.id), 0);
+  const getStageMaxStars = (stageId: StageId): number =>
+    STRATEGIES.filter((s) => s.stageId === stageId).length * STARS_PER_STRATEGY;
   const isStageUnlocked = (stageId: StageId): boolean => {
     if (stageId === StageId.StarterIsland) return true;
     const prev = STAGES.find((s) => s.id === stageId - 1);
@@ -1124,7 +1217,7 @@ export default function App() {
             </button>
             <span className="text-slate-300">|</span>
             <button
-              onClick={() => printCertificate(activeStage.id, activeStage.name, activeStage.emoji, stars, studentName)}
+              onClick={() => printCertificate(activeStage.id, activeStage.name, getStageEarnedStars(activeStage.id), getStageMaxStars(activeStage.id), studentName)}
               className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
             >
               Print Certificate
