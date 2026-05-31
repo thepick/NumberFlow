@@ -43,6 +43,7 @@ const QUESTION_REVEAL_GRACE = 3.75;
 const WRONG_BURST_WINDOW_MS = 9000;
 const WRONG_BURST_THRESHOLD = 2;
 const SLOW_DOWN_BANNER_MS = 1300;
+const SLOW_DOWN_LOCK_MS = 1500;
 const clampStars = (v: number) => Math.max(0, Math.min(STARS_PER_STRATEGY, v));
 const countStars = (a: StrategyStarAwards) =>
   Object.values(a).reduce((t, v) => t + clampStars(v || 0), 0);
@@ -119,6 +120,9 @@ export default function App() {
   const questionRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const correctAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slowDownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputCooldownQuestionIdRef = useRef<string | null>(null);
+  const inputCooldownActiveRef = useRef<boolean>(false);
   const wrongBurstCountRef = useRef<number>(0);
   const wrongBurstStartRef = useRef<number>(0);
   const answerRevealActiveRef = useRef<boolean>(false);
@@ -156,6 +160,7 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0);
   const [showSlowDown, setShowSlowDown] = useState<boolean>(false);
+  const [isInputCooldown, setIsInputCooldown] = useState<boolean>(false);
   const [answerReveal, setAnswerReveal] = useState<{ questionId: string; text: string } | null>(null);
 
   // State — UI
@@ -323,12 +328,37 @@ export default function App() {
     answerLockedRef.current = false;
   };
 
-  const clearSlowDownBanner = () => {
+  const clearInputCooldown = () => {
     if (slowDownTimerRef.current) {
       clearTimeout(slowDownTimerRef.current);
       slowDownTimerRef.current = null;
     }
+
+    if (inputCooldownTimerRef.current) {
+      clearTimeout(inputCooldownTimerRef.current);
+      inputCooldownTimerRef.current = null;
+    }
+
+    inputCooldownActiveRef.current = false;
+    inputCooldownQuestionIdRef.current = null;
+    setIsInputCooldown(false);
     setShowSlowDown(false);
+  };
+
+  const clearSlowDownBanner = () => {
+    clearInputCooldown();
+  };
+
+  const isInputTemporarilyBlocked = () => {
+    if (!inputCooldownActiveRef.current) return false;
+
+    const q = currentQuestionRef.current;
+    if (!q || inputCooldownQuestionIdRef.current !== q.id) {
+      clearInputCooldown();
+      return false;
+    }
+
+    return true;
   };
 
   const clearAnswerReveal = () => {
@@ -546,13 +576,34 @@ export default function App() {
     setUserAnswer(next);
   };
 
-  const showSlowDownBanner = () => {
+  const triggerSlowDownLock = () => {
+    const q = currentQuestionRef.current;
+    if (!q || roundCompletedRef.current) return;
+
+    clearPendingAnswerCheck();
+    setAnswerValue("");
     setShowSlowDown(true);
-    if (slowDownTimerRef.current) clearTimeout(slowDownTimerRef.current);
-    slowDownTimerRef.current = setTimeout(() => {
-      setShowSlowDown(false);
+    setIsInputCooldown(true);
+    inputCooldownActiveRef.current = true;
+    inputCooldownQuestionIdRef.current = q.id;
+
+    if (slowDownTimerRef.current) {
+      clearTimeout(slowDownTimerRef.current);
       slowDownTimerRef.current = null;
-    }, SLOW_DOWN_BANNER_MS);
+    }
+
+    if (inputCooldownTimerRef.current) clearTimeout(inputCooldownTimerRef.current);
+    inputCooldownTimerRef.current = setTimeout(() => {
+      inputCooldownTimerRef.current = null;
+
+      if (currentQuestionRef.current && currentQuestionRef.current.id === q.id) {
+        inputCooldownActiveRef.current = false;
+        inputCooldownQuestionIdRef.current = null;
+        setIsInputCooldown(false);
+        setShowSlowDown(false);
+        if (inputRef.current) inputRef.current.focus();
+      }
+    }, SLOW_DOWN_LOCK_MS);
   };
 
   const registerWrongBurst = () => {
@@ -566,7 +617,7 @@ export default function App() {
     }
 
     if (wrongBurstCountRef.current >= WRONG_BURST_THRESHOLD) {
-      showSlowDownBanner();
+      triggerSlowDownLock();
       wrongBurstCountRef.current = 0;
       wrongBurstStartRef.current = 0;
     }
@@ -592,7 +643,7 @@ export default function App() {
   };
 
   const handleCorrectAnswer = (submittedValue: string) => {
-    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
 
     clearPendingAnswerCheck();
     clearQuestionRevealTimer();
@@ -639,18 +690,20 @@ export default function App() {
   };
 
   const handleIncorrectAnswer = () => {
-    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
 
     clearPendingAnswerCheck();
     registerWrongBurst();
 
+    let recordedWrongNow = false;
     if (!answerRevealActiveRef.current && !hasRecordedWrongForQuestionRef.current) {
       hasRecordedWrongForQuestionRef.current = true;
       recordAttempt(false);
+      recordedWrongNow = true;
     }
 
     setCurrentStreak(0);
-    setConsecutiveErrors((p) => p + 1);
+    if (recordedWrongNow) setConsecutiveErrors((p) => p + 1);
     setIsAnimatingIncorrect(true);
     setIsAnimatingCorrect(false);
     setIsShaking(true);
@@ -665,7 +718,7 @@ export default function App() {
   };
 
   const checkRevealedAnswerValue = (rawValue: string, force = false) => {
-    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
 
     const raw = rawValue.trim();
     if (raw === "") {
@@ -717,13 +770,15 @@ export default function App() {
     clearSlowDownBanner();
     answerRevealActiveRef.current = true;
 
+    let recordedTimeoutNow = false;
     if (!hasRecordedWrongForQuestionRef.current) {
       hasRecordedWrongForQuestionRef.current = true;
       recordAttempt(false, true);
+      recordedTimeoutNow = true;
     }
 
     setCurrentStreak(0);
-    setConsecutiveErrors((p) => p + 1);
+    if (recordedTimeoutNow) setConsecutiveErrors((p) => p + 1);
     setIsAnimatingIncorrect(false);
     setIsAnimatingCorrect(false);
     setIsShaking(false);
@@ -733,7 +788,7 @@ export default function App() {
   };
 
   const checkAnswerValue = (rawValue: string, force = false) => {
-    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
 
     if (answerRevealActiveRef.current) {
       checkRevealedAnswerValue(rawValue, force);
@@ -771,7 +826,7 @@ export default function App() {
   const queueAnswerInputCheck = (nextValue: string) => {
     clearPendingAnswerCheck();
 
-    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
 
     const raw = nextValue.trim();
     if (!raw) {
@@ -817,7 +872,7 @@ export default function App() {
   };
 
   const handleNumClick = (val: string) => {
-    if (!isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
 
     const prev = userAnswerRef.current;
     let next = prev;
@@ -839,12 +894,18 @@ export default function App() {
   };
 
   const handleSubmit = () => {
+    if (isInputTemporarilyBlocked()) return;
     checkAnswerValue(userAnswerRef.current, true);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isRoundActiveRef.current || roundCompletedRef.current) return;
+      const isQuizKey = e.key === "Enter" || e.key === "Backspace" || /^[0-9]$/.test(e.key);
+      if (isInputTemporarilyBlocked()) {
+        if (isQuizKey) e.preventDefault();
+        return;
+      }
       if (e.key === "Enter") { e.preventDefault(); handleSubmit(); return; }
       if (e.key === "Backspace") { e.preventDefault(); handleNumClick("DEL"); return; }
       if (/^[0-9]$/.test(e.key)) { e.preventDefault(); handleNumClick(e.key); }
@@ -1189,7 +1250,7 @@ export default function App() {
                             inputMode="numeric"
                             value={userAnswer}
                             onChange={(e) => {
-                              if (!isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current) return;
+                              if (!isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current || isInputTemporarilyBlocked()) return;
                               const next = sanitizeAnswerInput(e.target.value);
                               setAnswerValue(next);
                               queueAnswerInputCheck(next);
@@ -1201,6 +1262,7 @@ export default function App() {
                             } ${isShaking ? "animate-pulse" : ""}`}
                             autoFocus
                             autoComplete="off"
+                            disabled={isInputCooldown}
                           />
                         </div>
                         <div className="text-xs font-bold text-slate-400 mt-1 flex items-center justify-center gap-2">
@@ -1249,15 +1311,16 @@ export default function App() {
                       <div className="timed-keypad-wrap">
                         <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
                           {["1","2","3","DEL","4","5","6","CLR","7","8","9","","","0","",""].map((k, i) => {
-                            if (k === "DEL") return <button key={i} onClick={() => handleNumClick("DEL")} className="p-3 rounded-xl bg-red-100 border-2 border-red-200 text-red-700 font-black text-sm cursor-pointer active:bg-red-200 transition">⌫</button>;
-                            if (k === "CLR") return <button key={i} onClick={() => handleNumClick("CLR")} className="p-3 rounded-xl bg-slate-100 border-2 border-slate-200 text-slate-700 font-black text-sm cursor-pointer active:bg-slate-200 transition">C</button>;
+                            if (k === "DEL") return <button key={i} onClick={() => handleNumClick("DEL")} disabled={isInputCooldown} className={`p-3 rounded-xl bg-red-100 border-2 border-red-200 text-red-700 font-black text-sm active:bg-red-200 transition ${isInputCooldown ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>⌫</button>;
+                            if (k === "CLR") return <button key={i} onClick={() => handleNumClick("CLR")} disabled={isInputCooldown} className={`p-3 rounded-xl bg-slate-100 border-2 border-slate-200 text-slate-700 font-black text-sm active:bg-slate-200 transition ${isInputCooldown ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>C</button>;
                             if (k === "") return <div key={i} />;
-                            return <button key={i} onClick={() => handleNumClick(k)} className="p-3 rounded-xl bg-white border-2 border-slate-200 text-blue-900 font-black text-lg cursor-pointer hover:bg-blue-50 active:bg-blue-100 transition shadow-sm">{k}</button>;
+                            return <button key={i} onClick={() => handleNumClick(k)} disabled={isInputCooldown} className={`p-3 rounded-xl bg-white border-2 border-slate-200 text-blue-900 font-black text-lg hover:bg-blue-50 active:bg-blue-100 transition shadow-sm ${isInputCooldown ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>{k}</button>;
                           })}
                         </div>
                         <button
                           onClick={handleSubmit}
-                          className="w-full max-w-xs mx-auto block mt-2 py-3 bg-[#FF4757] hover:bg-[#FF6B81] text-white font-black rounded-xl text-sm transition border-2 border-[#D63031] shadow-sm cursor-pointer"
+                          disabled={isInputCooldown}
+                          className={`w-full max-w-xs mx-auto block mt-2 py-3 bg-[#FF4757] hover:bg-[#FF6B81] text-white font-black rounded-xl text-sm transition border-2 border-[#D63031] shadow-sm ${isInputCooldown ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                         >
                           Submit
                         </button>
