@@ -105,6 +105,11 @@ export default function App() {
   const confettiClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const correctFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const incorrectFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAnswerCheckFrameRef = useRef<number | null>(null);
+  const pendingAnswerCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAnswerCheckTokenRef = useRef<number>(0);
+  const hasRecordedWrongForQuestionRef = useRef<boolean>(false);
+  const userAnswerRef = useRef<string>("");
 
   // State — progress
   const [currentStageId, setCurrentStageId] = useState<StageId>(StageId.StarterIsland);
@@ -151,6 +156,8 @@ export default function App() {
 
   const isTimedQuizInProgress = !!activeStrategyRound && !roundCompleted && (isRoundActive || countdownValue !== null);
 
+  useEffect(() => { userAnswerRef.current = userAnswer; }, [userAnswer]);
+
   // ─── Derived ──────────────────────────────────────────
 
   const activeStage = STAGES.find((s) => s.id === currentStageId) || STAGES[0];
@@ -190,6 +197,8 @@ export default function App() {
     if (confettiClearTimerRef.current) clearTimeout(confettiClearTimerRef.current);
     if (correctFeedbackTimerRef.current) clearTimeout(correctFeedbackTimerRef.current);
     if (incorrectFeedbackTimerRef.current) clearTimeout(incorrectFeedbackTimerRef.current);
+    if (pendingAnswerCheckFrameRef.current !== null) cancelAnimationFrame(pendingAnswerCheckFrameRef.current);
+    if (pendingAnswerCheckTimerRef.current) clearTimeout(pendingAnswerCheckTimerRef.current);
     document.body.classList.remove("timed-quiz-active");
     document.documentElement.classList.remove("timed-quiz-active");
   }, []);
@@ -266,7 +275,23 @@ export default function App() {
     return sel;
   };
 
+  const clearPendingAnswerCheck = () => {
+    pendingAnswerCheckTokenRef.current += 1;
+
+    if (pendingAnswerCheckFrameRef.current !== null) {
+      cancelAnimationFrame(pendingAnswerCheckFrameRef.current);
+      pendingAnswerCheckFrameRef.current = null;
+    }
+
+    if (pendingAnswerCheckTimerRef.current) {
+      clearTimeout(pendingAnswerCheckTimerRef.current);
+      pendingAnswerCheckTimerRef.current = null;
+    }
+  };
+
   const activateQ = (q: MathQuestion | null) => {
+    clearPendingAnswerCheck();
+    hasRecordedWrongForQuestionRef.current = false;
     currentQuestionRef.current = q; setCurrentQuestion(q);
     const now = Date.now(); questionStartedAtRef.current = now;
   };
@@ -289,6 +314,7 @@ export default function App() {
 
   const finishRound = () => {
     if (roundCompletedRef.current) return;
+    clearPendingAnswerCheck();
     roundCompletedRef.current = true;
     setRoundCompleted(true);
   };
@@ -300,15 +326,16 @@ export default function App() {
   };
 
   const resetRoundCounters = () => {
-    if (correctFeedbackTimerRef.current) clearTimeout(correctFeedbackTimerRef.current);
-    if (incorrectFeedbackTimerRef.current) clearTimeout(incorrectFeedbackTimerRef.current);
+    clearPendingAnswerCheck();
+    if (correctFeedbackTimerRef.current) { clearTimeout(correctFeedbackTimerRef.current); correctFeedbackTimerRef.current = null; }
+    if (incorrectFeedbackTimerRef.current) { clearTimeout(incorrectFeedbackTimerRef.current); incorrectFeedbackTimerRef.current = null; }
     roundCompletedRef.current = false;
     answerLockedRef.current = false;
     const now = Date.now(); questionStartedAtRef.current = now;
     setTimeLeft(60); setRoundScore(0); setRoundAttempts(0); setRoundCorrectAttempts(0);
     roundAttemptsRef.current = 0; roundCorrectAttemptsRef.current = 0;
     attemptsSinceQuickReviewRef.current = 0; recentReviewFactIdsRef.current = [];
-    setCurrentQuestionIdx(0); setUserAnswer(""); setRoundCompleted(false);
+    setCurrentQuestionIdx(0); setUserAnswer(""); userAnswerRef.current = ""; setRoundCompleted(false);
     setCurrentStreak(0); setBestStreakRound(0); setConsecutiveErrors(0);
     setIsAnimatingCorrect(false); setIsAnimatingIncorrect(false); setIsShaking(false);
     setSparklesList([]); setShowHint(false);
@@ -339,7 +366,7 @@ export default function App() {
     const { currentFacts, practicePool } = buildPool(strategy);
     currentStrategyFactsRef.current = currentFacts; questionPoolRef.current = practicePool;
     activateQ(chooseNextFact(currentFacts, factStatsRef.current, speedTarget));
-    setCurrentQuestionIdx(0); setUserAnswer(""); setShowHint(false); setRoundCompleted(false);
+    setCurrentQuestionIdx(0); setUserAnswer(""); userAnswerRef.current = ""; setShowHint(false); setRoundCompleted(false);
     roundCompletedRef.current = false; answerLockedRef.current = false;
     setRoundScore(0); setRoundAttempts(0); setRoundCorrectAttempts(0);
     roundAttemptsRef.current = 0; roundCorrectAttemptsRef.current = 0;
@@ -353,7 +380,7 @@ export default function App() {
   };
 
   const exitPractice = () => {
-    clearCountdown(); setIsRoundActive(false); setActiveStrategyRound(null);
+    clearCountdown(); clearPendingAnswerCheck(); setIsRoundActive(false); setActiveStrategyRound(null);
     document.body.classList.remove("timed-quiz-active");
     document.documentElement.classList.remove("timed-quiz-active");
   };
@@ -420,59 +447,195 @@ export default function App() {
 
   // ─── Input Handling ───────────────────────────────────
 
+  const getCurrentAnswerDigitLimit = () => {
+    const q = currentQuestionRef.current;
+    if (!q) return 8;
+    return Math.max(1, Math.min(8, String(q.answer).length));
+  };
+
+  const setAnswerValue = (next: string) => {
+    userAnswerRef.current = next;
+    setUserAnswer(next);
+  };
+
+  const handleCorrectAnswer = () => {
+    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+
+    clearPendingAnswerCheck();
+    const updatedStats = recordAttempt(true);
+
+    setRoundScore((p) => p + 1);
+    setCurrentStreak((p) => {
+      const next = p + 1;
+      setBestStreakRound((b) => Math.max(b, next));
+      return next;
+    });
+    setConsecutiveErrors(0);
+    setIsAnimatingCorrect(true);
+    setIsAnimatingIncorrect(false);
+    setIsShaking(false);
+    setAnswerValue("");
+    setShowHint(false);
+
+    if (correctFeedbackTimerRef.current) clearTimeout(correctFeedbackTimerRef.current);
+    correctFeedbackTimerRef.current = setTimeout(() => {
+      setIsAnimatingCorrect(false);
+      correctFeedbackTimerRef.current = null;
+    }, 400);
+
+    advanceQ(updatedStats);
+  };
+
+  const handleIncorrectAnswer = () => {
+    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+
+    clearPendingAnswerCheck();
+
+    if (!hasRecordedWrongForQuestionRef.current) {
+      hasRecordedWrongForQuestionRef.current = true;
+      recordAttempt(false);
+    }
+
+    setCurrentStreak(0);
+    setConsecutiveErrors((p) => p + 1);
+    setIsAnimatingIncorrect(true);
+    setIsAnimatingCorrect(false);
+    setIsShaking(true);
+    setAnswerValue("");
+
+    if (incorrectFeedbackTimerRef.current) clearTimeout(incorrectFeedbackTimerRef.current);
+    incorrectFeedbackTimerRef.current = setTimeout(() => {
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      incorrectFeedbackTimerRef.current = null;
+    }, 400);
+  };
+
+  const checkAnswerValue = (rawValue: string, force = false) => {
+    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+
+    const raw = rawValue.trim();
+    if (raw === "" || raw === "-") {
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      return;
+    }
+
+    const expected = currentQuestionRef.current.answer;
+    const neededDigits = getCurrentAnswerDigitLimit();
+
+    if (!force && raw.length < neededDigits) {
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      return;
+    }
+
+    const parsed = Number(raw);
+    if (Number.isNaN(parsed)) {
+      setAnswerValue("");
+      return;
+    }
+
+    if (parsed === expected) handleCorrectAnswer();
+    else if (force || raw.length >= neededDigits) handleIncorrectAnswer();
+  };
+
+  const queueAnswerInputCheck = (nextValue: string) => {
+    clearPendingAnswerCheck();
+
+    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+
+    const raw = nextValue.trim();
+    if (!raw || raw === "-") {
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      return;
+    }
+
+    const neededDigits = getCurrentAnswerDigitLimit();
+    if (raw.length < neededDigits) {
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      return;
+    }
+
+    const token = pendingAnswerCheckTokenRef.current;
+    const questionId = currentQuestionRef.current.id;
+    const submittedValue = raw;
+
+    const runCheck = () => {
+      pendingAnswerCheckFrameRef.current = null;
+      pendingAnswerCheckTimerRef.current = null;
+
+      if (token !== pendingAnswerCheckTokenRef.current) return;
+      if (!currentQuestionRef.current) return;
+      if (currentQuestionRef.current.id !== questionId) return;
+      if (userAnswerRef.current.trim() !== submittedValue) return;
+
+      checkAnswerValue(submittedValue, false);
+    };
+
+    pendingAnswerCheckFrameRef.current = requestAnimationFrame(() => {
+      pendingAnswerCheckFrameRef.current = null;
+      pendingAnswerCheckTimerRef.current = setTimeout(runCheck, 0);
+    });
+  };
+
+  const sanitizeAnswerInput = (value: string) => {
+    const limit = getCurrentAnswerDigitLimit();
+    let next = value.replace(/[^0-9-]/g, "");
+
+    if (next.indexOf("-") > 0) next = next.replace(/-/g, "");
+    if (next.startsWith("-")) next = "-" + next.slice(1).replace(/-/g, "");
+    else next = next.replace(/-/g, "");
+
+    if (next.length > limit) next = next.slice(0, limit);
+    return next;
+  };
+
   const handleNumClick = (val: string) => {
-    if (!isRoundActive || answerLockedRef.current || roundCompletedRef.current) return;
-    if (val === "DEL") setUserAnswer((p) => p.slice(0, -1));
-    else if (val === "CLR") setUserAnswer("");
-    else if (userAnswer.length < 8) setUserAnswer((p) => p + val);
+    if (!isRoundActive || roundCompletedRef.current) return;
+
+    const prev = userAnswerRef.current;
+    let next = prev;
+
+    if (val === "DEL") {
+      next = prev.slice(0, -1);
+    } else if (val === "CLR") {
+      next = "";
+    } else if (val === "-") {
+      next = prev === "-" ? "" : prev === "" ? "-" : prev;
+    } else {
+      const limit = getCurrentAnswerDigitLimit();
+      if (prev.length >= limit) return;
+      next = prev + val;
+    }
+
+    setAnswerValue(next);
+    queueAnswerInputCheck(next);
+
     if (inputRef.current) inputRef.current.focus();
   };
 
   const handleSubmit = () => {
-    if (!isRoundActive || answerLockedRef.current || roundCompletedRef.current || !currentQuestion) return;
-    if (userAnswer === "") return;
-    const parsed = parseInt(userAnswer, 10);
-    if (isNaN(parsed)) { setUserAnswer(""); return; }
-    answerLockedRef.current = true;
-    const correct = parsed === currentQuestion.answer;
-
-    if (correct) {
-      recordAttempt(true);
-      setRoundScore((p) => p + 1);
-      setCurrentStreak((p) => {
-        const next = p + 1;
-        setBestStreakRound((b) => Math.max(b, next));
-        return next;
-      });
-      setConsecutiveErrors(0);
-      setIsAnimatingCorrect(true);
-      correctFeedbackTimerRef.current = setTimeout(() => {
-        answerLockedRef.current = false; setIsAnimatingCorrect(false);
-        setUserAnswer(""); setShowHint(false); advanceQ();
-      }, 450);
-    } else {
-      recordAttempt(false);
-      setCurrentStreak(0);
-      setConsecutiveErrors((p) => p + 1);
-      setIsAnimatingIncorrect(true); setIsShaking(true);
-      incorrectFeedbackTimerRef.current = setTimeout(() => {
-        answerLockedRef.current = false; setIsAnimatingIncorrect(false); setIsShaking(false);
-        setUserAnswer(""); advanceQ();
-      }, 900);
-    }
+    checkAnswerValue(userAnswerRef.current, true);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!isRoundActive || answerLockedRef.current || roundCompletedRef.current) return;
+      if (!isRoundActive || roundCompletedRef.current) return;
       if (e.key === "Enter") { e.preventDefault(); handleSubmit(); return; }
       if (e.key === "Backspace") { e.preventDefault(); handleNumClick("DEL"); return; }
       if (/^[0-9]$/.test(e.key)) { e.preventDefault(); handleNumClick(e.key); return; }
-      if (e.key === "-") { e.preventDefault(); if (userAnswer === "" || userAnswer === "-") setUserAnswer((p) => p === "-" ? "" : "-"); }
+      if (e.key === "-") { e.preventDefault(); handleNumClick("-"); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isRoundActive, answerLockedRef, roundCompleted, userAnswer]);
+  }, [isRoundActive, roundCompleted]);
 
   // ─── Helpers ──────────────────────────────────────────
 
@@ -810,14 +973,14 @@ export default function App() {
                             inputMode="numeric"
                             value={userAnswer}
                             onChange={(e) => {
-                              if (answerLockedRef.current || roundCompletedRef.current) return;
-                              const v = e.target.value.replace(/[^0-9-]/g, "");
-                              if (v === "" || v === "-" || /^-?[0-9]{0,8}$/.test(v)) setUserAnswer(v);
+                              if (!isRoundActive || roundCompletedRef.current) return;
+                              const next = sanitizeAnswerInput(e.target.value);
+                              setAnswerValue(next);
+                              queueAnswerInputCheck(next);
                             }}
-                            onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
-                            className={`w-40 text-center text-3xl md:text-4xl font-mono font-black bg-transparent border-b-4 outline-none transition-colors py-2 ${
-                              isAnimatingCorrect ? "border-emerald-400 text-emerald-600" :
-                              isAnimatingIncorrect ? "border-red-400 text-red-500" :
+                            className={`timed-answer-input w-40 text-center text-3xl md:text-4xl font-mono font-black bg-transparent border-b-4 outline-none transition-colors py-2 ${
+                              isAnimatingCorrect ? "answer-glow-good border-emerald-400 text-emerald-600" :
+                              isAnimatingIncorrect ? "answer-glow-bad border-red-400 text-red-500" :
                               "border-blue-300 text-blue-800 focus:border-blue-500"
                             } ${isShaking ? "animate-pulse" : ""}`}
                             autoFocus
