@@ -63,6 +63,7 @@ interface CertificateTheme {
   background: string;
   ink: string;
   accent: string;
+  medallionTopMm: number;
 }
 
 const CERTIFICATE_THEMES: { [key: number]: CertificateTheme } = {
@@ -70,31 +71,37 @@ const CERTIFICATE_THEMES: { [key: number]: CertificateTheme } = {
     background: "certificates/starter-island.png",
     ink: "#173a78",
     accent: "#d97706",
+    medallionTopMm: 8.7,
   },
   [StageId.DoublesForest]: {
     background: "certificates/doubles-forest.png",
     ink: "#34511b",
     accent: "#b37b0f",
+    medallionTopMm: 8.7,
   },
   [StageId.BridgeTown]: {
     background: "certificates/bridge-town.png",
     ink: "#174387",
     accent: "#c47b12",
+    medallionTopMm: 8.7,
   },
   [StageId.FamilyVillage]: {
     background: "certificates/family-village.png",
     ink: "#5b2f7f",
     accent: "#d97706",
+    medallionTopMm: 8.7,
   },
   [StageId.BigNumberMountain]: {
     background: "certificates/big-number-mountain.png",
     ink: "#7b2f54",
     accent: "#c47b12",
+    medallionTopMm: 8.7,
   },
   [StageId.TheSummit]: {
     background: "certificates/the-summit.png",
     ink: "#173a78",
     accent: "#b37b0f",
+    medallionTopMm: 8.7,
   },
 };
 
@@ -111,13 +118,13 @@ function getAbsoluteCertificateAssetUrl(path: string): string {
   return new URL(path, new URL("./", window.location.href)).href;
 }
 
-function getFilledCertificateStarSlots(starsCount: number, maxStarsCount: number): number {
-  if (maxStarsCount <= 0 || starsCount <= 0) return 0;
-  return Math.max(1, Math.min(CERTIFICATE_STAR_SLOTS, Math.round((starsCount / maxStarsCount) * CERTIFICATE_STAR_SLOTS)));
+function getFilledCertificateStarSlots(starsCount: number): number {
+  if (starsCount <= 0) return 0;
+  return Math.min(CERTIFICATE_STAR_SLOTS, Math.max(0, Math.round(starsCount)));
 }
 
-function makeCertificateStarRow(starsCount: number, maxStarsCount: number): string {
-  const filledSlots = getFilledCertificateStarSlots(starsCount, maxStarsCount);
+function makeCertificateStarRow(starsCount: number): string {
+  const filledSlots = getFilledCertificateStarSlots(starsCount);
   return Array.from({ length: CERTIFICATE_STAR_SLOTS }, (_, i) => (
     `<span class="star ${i < filledSlots ? "filled" : "empty"}">&#9733;</span>`
   )).join("");
@@ -125,18 +132,22 @@ function makeCertificateStarRow(starsCount: number, maxStarsCount: number): stri
 
 function printCertificate(
   stageNum: number, stageName: string,
-  starsCount: number, maxStarsCount: number, userName: string,
+  starsCount: number, userName: string,
 ) {
   const w = window.open("", "_blank");
   if (!w) { alert("Please allow popups to print!"); return; }
 
   const theme = CERTIFICATE_THEMES[stageNum] || CERTIFICATE_THEMES[StageId.StarterIsland];
-  const safeName = escapeHtml(userName.trim() || "Math Explorer");
+  const trimmedName = userName.trim();
+  if (!trimmedName) { alert("Please enter a name for the certificate."); return; }
+  const stage = STAGES.find((s) => s.id === stageNum);
+  const safeName = escapeHtml(trimmedName);
   const safeChapter = escapeHtml(`Chapter ${stageNum}: ${stageName}`);
+  const safeIcon = escapeHtml(stage?.emoji || "⭐");
   const safeDate = escapeHtml(new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }));
   const safeBackgroundUrl = escapeHtml(getAbsoluteCertificateAssetUrl(theme.background));
   const safeStarsText = escapeHtml(`${starsCount} Star${starsCount === 1 ? "" : "s"} Earned`);
-  const starRow = makeCertificateStarRow(starsCount, maxStarsCount);
+  const starRow = makeCertificateStarRow(starsCount);
   const nameClass = safeName.length > 20 ? " xsmall" : safeName.length > 14 ? " small" : "";
 
   w.document.write(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Certificate</title><style>
@@ -147,19 +158,21 @@ function printCertificate(
     .certificate-page{position:relative;width:297mm;height:210mm;overflow:hidden;background:#fff;box-shadow:0 18px 48px rgba(15,23,42,.18)}
     .certificate-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
     .overlay{position:absolute;left:50%;transform:translateX(-50%);text-align:center;color:${theme.ink};text-shadow:0 2px 8px rgba(255,255,255,.64),0 1px 1px rgba(255,255,255,.8)}
-    .top-brand{top:9mm;font-size:6.3mm;font-weight:900;letter-spacing:.24em;text-transform:uppercase}
-    .chapter-title{top:49mm;width:172mm;font-family:Georgia,'Times New Roman',serif;font-size:9.2mm;font-weight:800;line-height:1.1;color:#fff;text-shadow:0 2px 9px rgba(0,0,0,.28),0 1px 0 rgba(0,0,0,.3)}
-    .awarded-to{top:73mm;font-size:5.9mm;font-weight:800;color:${theme.ink}}
-    .student-name{top:82mm;width:215mm;font-family:Georgia,'Times New Roman',serif;font-size:21mm;font-weight:900;line-height:1;color:${theme.ink};text-shadow:0 2px 0 #fff,0 5px 12px rgba(15,23,42,.2)}
+    .top-brand{top:3.2mm;width:178mm;padding:1.5mm 8mm;border-radius:999mm;background:linear-gradient(90deg,rgba(12,34,80,.03),rgba(12,34,80,.84),rgba(12,34,80,.03));font-size:4.45mm;font-weight:900;letter-spacing:.24em;text-transform:uppercase;color:#fff5cf;text-shadow:0 1px 0 #68460b,0 3px 10px rgba(0,0,0,.58);z-index:4}
+    .chapter-medallion-icon{top:${theme.medallionTopMm}mm;width:28mm;height:28mm;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#fffdf2 0%,#fff3c4 46%,#f2ba37 100%);border:1.1mm solid #f7d279;box-shadow:0 0 0 .55mm rgba(92,64,20,.24),0 3mm 9mm rgba(0,0,0,.18);font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;font-size:15mm;line-height:1;z-index:3}
+    .chapter-title{top:52mm;width:174mm;padding:2.1mm 8mm;border-radius:999mm;font-family:Georgia,'Times New Roman',serif;font-size:8.6mm;font-weight:900;line-height:1.1;color:#fff;background:linear-gradient(90deg,rgba(9,30,76,0),rgba(9,30,76,.88),rgba(9,30,76,0));text-shadow:0 2px 8px rgba(0,0,0,.52),0 1px 0 rgba(0,0,0,.42);z-index:2}
+    .awarded-to{top:74mm;font-size:5.9mm;font-weight:800;color:${theme.ink}}
+    .student-name{top:83mm;width:215mm;font-family:Georgia,'Times New Roman',serif;font-size:21mm;font-weight:900;line-height:1;color:${theme.ink};text-shadow:0 2px 0 #fff,0 5px 12px rgba(15,23,42,.2)}
     .student-name.small{font-size:17mm}.student-name.xsmall{font-size:14mm}
-    .stars-earned{top:107mm;font-size:7.2mm;font-weight:900;color:${theme.accent};text-shadow:0 2px 6px rgba(255,255,255,.7)}
+    .stars-earned{top:108mm;font-size:7.2mm;font-weight:900;color:${theme.accent};text-shadow:0 2px 6px rgba(255,255,255,.7)}
     .star-row{top:119mm;display:flex;justify-content:center;gap:3.7mm;font-size:10.5mm;line-height:1}
     .star{color:rgba(255,255,255,.55);text-shadow:0 2px 6px rgba(0,0,0,.2)}.star.filled{color:#f4c533}.star.empty{color:rgba(255,255,255,.55)}
-    .date-field{bottom:6.2mm;width:92mm;font-family:Georgia,'Times New Roman',serif;font-size:6.8mm;font-weight:800;color:${theme.ink}}
+    .date-field{bottom:14.4mm;width:86mm;font-family:Georgia,'Times New Roman',serif;font-size:5.7mm;font-weight:900;color:${theme.ink};text-shadow:0 1px 0 #fff,0 2px 7px rgba(255,255,255,.72)}
     @media print{html,body{width:297mm;height:210mm;background:#fff;padding:0}.certificate-page{width:297mm;height:210mm;box-shadow:none}}
   </style></head><body><div class="certificate-page">
     <img class="certificate-bg" src="${safeBackgroundUrl}" alt="">
     <div class="overlay top-brand">MENTAL MATH JOURNEY</div>
+    <div class="overlay chapter-medallion-icon" aria-hidden="true">${safeIcon}</div>
     <div class="overlay chapter-title">${safeChapter}</div>
     <div class="overlay awarded-to">Awarded to</div>
     <div class="overlay student-name${nameClass}">${safeName}</div>
@@ -224,7 +237,7 @@ export default function App() {
   const [stars, setStars] = useState<number>(0);
   const [strategyStars, setStrategyStars] = useState<StrategyStarAwards>({});
   const [lastRoundStarResult, setLastRoundStarResult] = useState<RoundStarResult | null>(null);
-  const [studentName, setStudentName] = useState<string>("");
+
 
   // State — settings
   const [speedTarget, setSpeedTarget] = useState<number>(20);
@@ -261,6 +274,9 @@ export default function App() {
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [showLessonModal, setShowLessonModal] = useState<Strategy | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showCertificateModal, setShowCertificateModal] = useState<boolean>(false);
+  const [certificateNameInput, setCertificateNameInput] = useState<string>("");
+  const [certificateRequest, setCertificateRequest] = useState<{ stageId: number; stageName: string; starsCount: number } | null>(null);
   const [showAllDone, setShowAllDone] = useState<boolean>(false);
 
   const isTimedQuizInProgress = !!activeStrategyRound && !roundCompleted && (isRoundActive || countdownValue !== null);
@@ -284,6 +300,30 @@ export default function App() {
     const prev = STAGES.find((s) => s.id === stageId - 1);
     if (!prev) return true;
     return STRATEGIES.filter((s) => s.stageId === prev.id).every((s) => masteredStrategyIds.includes(s.id));
+  };
+
+  const openCertificateModal = (stageId: StageId, stageName: string) => {
+    setCertificateRequest({
+      stageId,
+      stageName,
+      starsCount: getStageEarnedStars(stageId),
+    });
+    setCertificateNameInput("");
+    setShowCertificateModal(true);
+  };
+
+  const handlePrintCertificateFromModal = () => {
+    if (!certificateRequest) return;
+    const trimmedName = certificateNameInput.trim();
+    if (!trimmedName) return;
+    printCertificate(
+      certificateRequest.stageId,
+      certificateRequest.stageName,
+      certificateRequest.starsCount,
+      trimmedName,
+    );
+    setShowCertificateModal(false);
+    setCertificateNameInput("");
   };
 
   // ─── LocalStorage ─────────────────────────────────────
@@ -1217,7 +1257,7 @@ export default function App() {
             </button>
             <span className="text-slate-300">|</span>
             <button
-              onClick={() => printCertificate(activeStage.id, activeStage.name, getStageEarnedStars(activeStage.id), getStageMaxStars(activeStage.id), studentName)}
+              onClick={() => openCertificateModal(activeStage.id, activeStage.name)}
               className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
             >
               Print Certificate
@@ -1524,6 +1564,77 @@ export default function App() {
         )}
       </AnimatePresence>
 
+
+      {/* Certificate Modal */}
+      <AnimatePresence>
+        {showCertificateModal && certificateRequest && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+            onClick={() => setShowCertificateModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl border-4 border-amber-300 p-6 max-w-sm w-full shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-lg font-display font-black text-blue-950">Create Certificate</h3>
+                  <p className="text-xs font-bold text-slate-500 mt-0.5">Chapter {certificateRequest.stageId}: {certificateRequest.stageName}</p>
+                </div>
+                <button onClick={() => setShowCertificateModal(false)} className="p-1.5 rounded-full hover:bg-slate-100 cursor-pointer transition">
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 mb-4 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  {renderStars(Math.min(CERTIFICATE_STAR_SLOTS, certificateRequest.starsCount), "w-4 h-4")}
+                </div>
+                <p className="text-sm font-black text-amber-700">
+                  {certificateRequest.starsCount} Star{certificateRequest.starsCount === 1 ? "" : "s"} Earned
+                </p>
+              </div>
+
+              <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-1">Enter your name</label>
+              <input
+                type="text"
+                value={certificateNameInput}
+                placeholder="Student name"
+                maxLength={32}
+                autoFocus
+                onChange={(e) => setCertificateNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && certificateNameInput.trim()) handlePrintCertificateFromModal();
+                }}
+                className="w-full px-3 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-base font-bold focus:outline-none focus:border-amber-300"
+              />
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setShowCertificateModal(false)}
+                  className="flex-1 bg-white hover:bg-slate-50 text-slate-600 font-bold py-2.5 rounded-xl text-sm transition border-2 border-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePrintCertificateFromModal}
+                  disabled={!certificateNameInput.trim()}
+                  className={`flex-1 font-black py-2.5 rounded-xl text-sm transition border-2 ${
+                    certificateNameInput.trim()
+                      ? "bg-amber-400 hover:bg-amber-500 border-amber-500 text-blue-950 cursor-pointer shadow-sm"
+                      : "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                  }`}
+                >
+                  Print
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Settings Modal */}
       <AnimatePresence>
         {showSettingsModal && (
@@ -1561,14 +1672,6 @@ export default function App() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-1">Your Name</label>
-                  <input
-                    type="text" value={studentName} placeholder="Your name"
-                    onChange={(e) => setStudentName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:border-blue-300"
-                  />
-                </div>
 
                 <button
                   onClick={() => {
