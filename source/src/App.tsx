@@ -37,6 +37,12 @@ interface ConfettiPiece {
 // ─── Constants ──────────────────────────────────────────
 
 const STARS_PER_STRATEGY = 3;
+const CORRECT_ANSWER_HOLD_MS = 275;
+const REVEALED_ANSWER_HOLD_MS = 225;
+const QUESTION_REVEAL_GRACE = 1.25;
+const WRONG_BURST_WINDOW_MS = 9000;
+const WRONG_BURST_THRESHOLD = 2;
+const SLOW_DOWN_BANNER_MS = 1300;
 const clampStars = (v: number) => Math.max(0, Math.min(STARS_PER_STRATEGY, v));
 const countStars = (a: StrategyStarAwards) =>
   Object.values(a).reduce((t, v) => t + clampStars(v || 0), 0);
@@ -94,6 +100,7 @@ export default function App() {
   const currentQuestionRef = useRef<MathQuestion | null>(null);
   const questionStartedAtRef = useRef<number>(Date.now());
   const answerLockedRef = useRef<boolean>(false);
+  const isRoundActiveRef = useRef<boolean>(false);
   const roundCompletedRef = useRef<boolean>(false);
   const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const roundAttemptsRef = useRef<number>(0);
@@ -109,6 +116,12 @@ export default function App() {
   const pendingAnswerCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAnswerCheckTokenRef = useRef<number>(0);
   const hasRecordedWrongForQuestionRef = useRef<boolean>(false);
+  const questionRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const correctAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slowDownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrongBurstCountRef = useRef<number>(0);
+  const wrongBurstStartRef = useRef<number>(0);
+  const answerRevealActiveRef = useRef<boolean>(false);
   const userAnswerRef = useRef<string>("");
 
   // State — progress
@@ -142,6 +155,8 @@ export default function App() {
   const [bestStreakRound, setBestStreakRound] = useState<number>(0);
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [consecutiveErrors, setConsecutiveErrors] = useState<number>(0);
+  const [showSlowDown, setShowSlowDown] = useState<boolean>(false);
+  const [answerReveal, setAnswerReveal] = useState<{ questionId: string; text: string } | null>(null);
 
   // State — UI
   const [isAnimatingCorrect, setIsAnimatingCorrect] = useState<boolean>(false);
@@ -157,6 +172,7 @@ export default function App() {
   const isTimedQuizInProgress = !!activeStrategyRound && !roundCompleted && (isRoundActive || countdownValue !== null);
 
   useEffect(() => { userAnswerRef.current = userAnswer; }, [userAnswer]);
+  useEffect(() => { isRoundActiveRef.current = isRoundActive; }, [isRoundActive]);
 
   // ─── Derived ──────────────────────────────────────────
 
@@ -199,6 +215,9 @@ export default function App() {
     if (incorrectFeedbackTimerRef.current) clearTimeout(incorrectFeedbackTimerRef.current);
     if (pendingAnswerCheckFrameRef.current !== null) cancelAnimationFrame(pendingAnswerCheckFrameRef.current);
     if (pendingAnswerCheckTimerRef.current) clearTimeout(pendingAnswerCheckTimerRef.current);
+    if (questionRevealTimerRef.current) clearTimeout(questionRevealTimerRef.current);
+    if (correctAdvanceTimerRef.current) clearTimeout(correctAdvanceTimerRef.current);
+    if (slowDownTimerRef.current) clearTimeout(slowDownTimerRef.current);
     document.body.classList.remove("timed-quiz-active");
     document.documentElement.classList.remove("timed-quiz-active");
   }, []);
@@ -289,11 +308,67 @@ export default function App() {
     }
   };
 
+  const clearQuestionRevealTimer = () => {
+    if (questionRevealTimerRef.current) {
+      clearTimeout(questionRevealTimerRef.current);
+      questionRevealTimerRef.current = null;
+    }
+  };
+
+  const clearCorrectAdvanceTimer = () => {
+    if (correctAdvanceTimerRef.current) {
+      clearTimeout(correctAdvanceTimerRef.current);
+      correctAdvanceTimerRef.current = null;
+    }
+    answerLockedRef.current = false;
+  };
+
+  const clearSlowDownBanner = () => {
+    if (slowDownTimerRef.current) {
+      clearTimeout(slowDownTimerRef.current);
+      slowDownTimerRef.current = null;
+    }
+    setShowSlowDown(false);
+  };
+
+  const clearAnswerReveal = () => {
+    answerRevealActiveRef.current = false;
+    setAnswerReveal(null);
+  };
+
+  const getQuestionRevealMs = () => {
+    const factsPerMinute = Math.max(1, speedTarget);
+    return Math.max(1200, Math.round((60000 / factsPerMinute) * QUESTION_REVEAL_GRACE));
+  };
+
+  const startQuestionRevealTimer = () => {
+    clearQuestionRevealTimer();
+
+    const q = currentQuestionRef.current;
+    if (!q || !isRoundActiveRef.current || roundCompletedRef.current) return;
+
+    const questionId = q.id;
+    questionRevealTimerRef.current = setTimeout(() => {
+      questionRevealTimerRef.current = null;
+      if (!currentQuestionRef.current || currentQuestionRef.current.id !== questionId) return;
+      triggerAnswerReveal();
+    }, getQuestionRevealMs());
+  };
+
   const activateQ = (q: MathQuestion | null) => {
     clearPendingAnswerCheck();
+    clearQuestionRevealTimer();
+    clearAnswerReveal();
+    clearSlowDownBanner();
     hasRecordedWrongForQuestionRef.current = false;
+    wrongBurstCountRef.current = 0;
+    wrongBurstStartRef.current = 0;
     currentQuestionRef.current = q; setCurrentQuestion(q);
     const now = Date.now(); questionStartedAtRef.current = now;
+    setIsAnimatingCorrect(false);
+    setIsAnimatingIncorrect(false);
+    setIsShaking(false);
+    if (q && isRoundActiveRef.current && !roundCompletedRef.current) startQuestionRevealTimer();
   };
 
   const recordAttempt = (correct: boolean, timeout = false): FactStatsMap => {
@@ -315,6 +390,11 @@ export default function App() {
   const finishRound = () => {
     if (roundCompletedRef.current) return;
     clearPendingAnswerCheck();
+    clearQuestionRevealTimer();
+    clearCorrectAdvanceTimer();
+    clearAnswerReveal();
+    clearSlowDownBanner();
+    isRoundActiveRef.current = false;
     roundCompletedRef.current = true;
     setRoundCompleted(true);
   };
@@ -327,6 +407,12 @@ export default function App() {
 
   const resetRoundCounters = () => {
     clearPendingAnswerCheck();
+    clearQuestionRevealTimer();
+    clearCorrectAdvanceTimer();
+    clearAnswerReveal();
+    clearSlowDownBanner();
+    wrongBurstCountRef.current = 0;
+    wrongBurstStartRef.current = 0;
     if (correctFeedbackTimerRef.current) { clearTimeout(correctFeedbackTimerRef.current); correctFeedbackTimerRef.current = null; }
     if (incorrectFeedbackTimerRef.current) { clearTimeout(incorrectFeedbackTimerRef.current); incorrectFeedbackTimerRef.current = null; }
     roundCompletedRef.current = false;
@@ -342,13 +428,14 @@ export default function App() {
   };
 
   const beginRoundNow = () => {
-    clearCountdown(); resetRoundCounters(); setIsRoundActive(true);
+    clearCountdown(); resetRoundCounters(); isRoundActiveRef.current = true; setIsRoundActive(true);
+    startQuestionRevealTimer();
     setTimeout(() => { const el = document.activeElement as HTMLElement | null; if (el) el.blur(); }, 0);
   };
 
   const startCountdown = () => {
     if (isRoundActive || countdownValue !== null) return;
-    resetRoundCounters(); setIsRoundActive(false); setCountdownValue("3");
+    resetRoundCounters(); isRoundActiveRef.current = false; setIsRoundActive(false); setCountdownValue("3");
     setEncouragingText("Get ready...");
     [
       [1000, "2"], [2000, "1"], [3000, "Go!"], [3700, null, true],
@@ -367,20 +454,21 @@ export default function App() {
     currentStrategyFactsRef.current = currentFacts; questionPoolRef.current = practicePool;
     activateQ(chooseNextFact(currentFacts, factStatsRef.current, speedTarget));
     setCurrentQuestionIdx(0); setUserAnswer(""); userAnswerRef.current = ""; setShowHint(false); setRoundCompleted(false);
-    roundCompletedRef.current = false; answerLockedRef.current = false;
+    roundCompletedRef.current = false; answerLockedRef.current = false; isRoundActiveRef.current = false;
     setRoundScore(0); setRoundAttempts(0); setRoundCorrectAttempts(0);
     roundAttemptsRef.current = 0; roundCorrectAttemptsRef.current = 0;
     attemptsSinceQuickReviewRef.current = 0; recentReviewFactIdsRef.current = [];
     setTimeLeft(60); setConsecutiveErrors(0);
     setIsAnimatingCorrect(false); setIsAnimatingIncorrect(false); setIsShaking(false);
     setSparklesList([]); setEncouragingText("Let's go!");
-    setCurrentStreak(0); setBestStreakRound(0); setIsRoundActive(false);
+    setCurrentStreak(0); setBestStreakRound(0); isRoundActiveRef.current = false; setIsRoundActive(false);
     document.body.classList.add("timed-quiz-active");
     document.documentElement.classList.add("timed-quiz-active");
   };
 
   const exitPractice = () => {
-    clearCountdown(); clearPendingAnswerCheck(); setIsRoundActive(false); setActiveStrategyRound(null);
+    clearCountdown(); clearPendingAnswerCheck(); clearQuestionRevealTimer(); clearCorrectAdvanceTimer(); clearAnswerReveal(); clearSlowDownBanner();
+    isRoundActiveRef.current = false; setIsRoundActive(false); setActiveStrategyRound(null);
     document.body.classList.remove("timed-quiz-active");
     document.documentElement.classList.remove("timed-quiz-active");
   };
@@ -458,10 +546,59 @@ export default function App() {
     setUserAnswer(next);
   };
 
-  const handleCorrectAnswer = () => {
-    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+  const showSlowDownBanner = () => {
+    setShowSlowDown(true);
+    if (slowDownTimerRef.current) clearTimeout(slowDownTimerRef.current);
+    slowDownTimerRef.current = setTimeout(() => {
+      setShowSlowDown(false);
+      slowDownTimerRef.current = null;
+    }, SLOW_DOWN_BANNER_MS);
+  };
+
+  const registerWrongBurst = () => {
+    const now = Date.now();
+
+    if (!wrongBurstStartRef.current || now - wrongBurstStartRef.current > WRONG_BURST_WINDOW_MS) {
+      wrongBurstStartRef.current = now;
+      wrongBurstCountRef.current = 1;
+    } else {
+      wrongBurstCountRef.current += 1;
+    }
+
+    if (wrongBurstCountRef.current >= WRONG_BURST_THRESHOLD) {
+      showSlowDownBanner();
+      wrongBurstCountRef.current = 0;
+      wrongBurstStartRef.current = 0;
+    }
+  };
+
+  const completeCorrectTransition = (stats: FactStatsMap, questionId: string, holdMs: number) => {
+    clearCorrectAdvanceTimer();
+    answerLockedRef.current = true;
+
+    correctAdvanceTimerRef.current = setTimeout(() => {
+      correctAdvanceTimerRef.current = null;
+      if (roundCompletedRef.current) { answerLockedRef.current = false; return; }
+      if (!currentQuestionRef.current || currentQuestionRef.current.id !== questionId) { answerLockedRef.current = false; return; }
+
+      answerLockedRef.current = false;
+      setAnswerValue("");
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      setShowHint(false);
+      advanceQ(stats);
+    }, holdMs);
+  };
+
+  const handleCorrectAnswer = (submittedValue: string) => {
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
 
     clearPendingAnswerCheck();
+    clearQuestionRevealTimer();
+    clearAnswerReveal();
+    clearSlowDownBanner();
+    const questionId = currentQuestionRef.current.id;
     const updatedStats = recordAttempt(true);
 
     setRoundScore((p) => p + 1);
@@ -474,24 +611,40 @@ export default function App() {
     setIsAnimatingCorrect(true);
     setIsAnimatingIncorrect(false);
     setIsShaking(false);
-    setAnswerValue("");
-    setShowHint(false);
+    setAnswerValue(submittedValue);
 
-    if (correctFeedbackTimerRef.current) clearTimeout(correctFeedbackTimerRef.current);
-    correctFeedbackTimerRef.current = setTimeout(() => {
-      setIsAnimatingCorrect(false);
-      correctFeedbackTimerRef.current = null;
-    }, 400);
+    if (correctFeedbackTimerRef.current) { clearTimeout(correctFeedbackTimerRef.current); correctFeedbackTimerRef.current = null; }
 
-    advanceQ(updatedStats);
+    completeCorrectTransition(updatedStats, questionId, CORRECT_ANSWER_HOLD_MS);
+  };
+
+  const handleRevealedAnswerComplete = (submittedValue: string) => {
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+
+    clearPendingAnswerCheck();
+    clearQuestionRevealTimer();
+    clearSlowDownBanner();
+    const questionId = currentQuestionRef.current.id;
+    const stats = factStatsRef.current;
+
+    answerRevealActiveRef.current = false;
+    setAnswerReveal(null);
+    setCurrentStreak(0);
+    setIsAnimatingCorrect(true);
+    setIsAnimatingIncorrect(false);
+    setIsShaking(false);
+    setAnswerValue(submittedValue);
+
+    completeCorrectTransition(stats, questionId, REVEALED_ANSWER_HOLD_MS);
   };
 
   const handleIncorrectAnswer = () => {
-    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
 
     clearPendingAnswerCheck();
+    registerWrongBurst();
 
-    if (!hasRecordedWrongForQuestionRef.current) {
+    if (!answerRevealActiveRef.current && !hasRecordedWrongForQuestionRef.current) {
       hasRecordedWrongForQuestionRef.current = true;
       recordAttempt(false);
     }
@@ -511,11 +664,11 @@ export default function App() {
     }, 400);
   };
 
-  const checkAnswerValue = (rawValue: string, force = false) => {
-    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+  const checkRevealedAnswerValue = (rawValue: string, force = false) => {
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
 
     const raw = rawValue.trim();
-    if (raw === "" || raw === "-") {
+    if (raw === "") {
       setIsAnimatingCorrect(false);
       setIsAnimatingIncorrect(false);
       setIsShaking(false);
@@ -538,17 +691,90 @@ export default function App() {
       return;
     }
 
-    if (parsed === expected) handleCorrectAnswer();
+    if (parsed === expected) {
+      handleRevealedAnswerComplete(raw);
+    } else if (force || raw.length >= neededDigits) {
+      setIsAnimatingIncorrect(true);
+      setIsAnimatingCorrect(false);
+      setIsShaking(true);
+      setAnswerValue("");
+
+      if (incorrectFeedbackTimerRef.current) clearTimeout(incorrectFeedbackTimerRef.current);
+      incorrectFeedbackTimerRef.current = setTimeout(() => {
+        setIsAnimatingIncorrect(false);
+        setIsShaking(false);
+        incorrectFeedbackTimerRef.current = null;
+      }, 400);
+    }
+  };
+
+  const triggerAnswerReveal = () => {
+    const q = currentQuestionRef.current;
+    if (!q || !isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current) return;
+
+    clearPendingAnswerCheck();
+    clearQuestionRevealTimer();
+    clearSlowDownBanner();
+    answerRevealActiveRef.current = true;
+
+    if (!hasRecordedWrongForQuestionRef.current) {
+      hasRecordedWrongForQuestionRef.current = true;
+      recordAttempt(false, true);
+    }
+
+    setCurrentStreak(0);
+    setConsecutiveErrors((p) => p + 1);
+    setIsAnimatingIncorrect(false);
+    setIsAnimatingCorrect(false);
+    setIsShaking(false);
+    setAnswerValue("");
+    setShowHint(false);
+    setAnswerReveal({ questionId: q.id, text: `${q.question} = ${q.answer}` });
+  };
+
+  const checkAnswerValue = (rawValue: string, force = false) => {
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
+
+    if (answerRevealActiveRef.current) {
+      checkRevealedAnswerValue(rawValue, force);
+      return;
+    }
+
+    const raw = rawValue.trim();
+    if (raw === "") {
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      return;
+    }
+
+    const expected = currentQuestionRef.current.answer;
+    const neededDigits = getCurrentAnswerDigitLimit();
+
+    if (!force && raw.length < neededDigits) {
+      setIsAnimatingCorrect(false);
+      setIsAnimatingIncorrect(false);
+      setIsShaking(false);
+      return;
+    }
+
+    const parsed = Number(raw);
+    if (Number.isNaN(parsed)) {
+      setAnswerValue("");
+      return;
+    }
+
+    if (parsed === expected) handleCorrectAnswer(raw);
     else if (force || raw.length >= neededDigits) handleIncorrectAnswer();
   };
 
   const queueAnswerInputCheck = (nextValue: string) => {
     clearPendingAnswerCheck();
 
-    if (!isRoundActive || roundCompletedRef.current || !currentQuestionRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || !currentQuestionRef.current || answerLockedRef.current) return;
 
     const raw = nextValue.trim();
-    if (!raw || raw === "-") {
+    if (!raw) {
       setIsAnimatingCorrect(false);
       setIsAnimatingIncorrect(false);
       setIsShaking(false);
@@ -587,18 +813,11 @@ export default function App() {
 
   const sanitizeAnswerInput = (value: string) => {
     const limit = getCurrentAnswerDigitLimit();
-    let next = value.replace(/[^0-9-]/g, "");
-
-    if (next.indexOf("-") > 0) next = next.replace(/-/g, "");
-    if (next.startsWith("-")) next = "-" + next.slice(1).replace(/-/g, "");
-    else next = next.replace(/-/g, "");
-
-    if (next.length > limit) next = next.slice(0, limit);
-    return next;
+    return value.replace(/\D/g, "").slice(0, limit);
   };
 
   const handleNumClick = (val: string) => {
-    if (!isRoundActive || roundCompletedRef.current) return;
+    if (!isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current) return;
 
     const prev = userAnswerRef.current;
     let next = prev;
@@ -607,8 +826,6 @@ export default function App() {
       next = prev.slice(0, -1);
     } else if (val === "CLR") {
       next = "";
-    } else if (val === "-") {
-      next = prev === "-" ? "" : prev === "" ? "-" : prev;
     } else {
       const limit = getCurrentAnswerDigitLimit();
       if (prev.length >= limit) return;
@@ -627,11 +844,10 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!isRoundActive || roundCompletedRef.current) return;
+      if (!isRoundActiveRef.current || roundCompletedRef.current) return;
       if (e.key === "Enter") { e.preventDefault(); handleSubmit(); return; }
       if (e.key === "Backspace") { e.preventDefault(); handleNumClick("DEL"); return; }
-      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); handleNumClick(e.key); return; }
-      if (e.key === "-") { e.preventDefault(); handleNumClick("-"); }
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); handleNumClick(e.key); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -973,7 +1189,7 @@ export default function App() {
                             inputMode="numeric"
                             value={userAnswer}
                             onChange={(e) => {
-                              if (!isRoundActive || roundCompletedRef.current) return;
+                              if (!isRoundActiveRef.current || roundCompletedRef.current || answerLockedRef.current) return;
                               const next = sanitizeAnswerInput(e.target.value);
                               setAnswerValue(next);
                               queueAnswerInputCheck(next);
@@ -998,17 +1214,41 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Feedback */}
+                      <div className="timed-feedback-zone" aria-live="polite">
+                        <AnimatePresence mode="wait">
+                          {answerReveal && (
+                            <motion.div
+                              key={`answer-reveal-${answerReveal.questionId}`}
+                              initial={{ opacity: 0, y: -6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 6 }}
+                              className="timed-answer-reveal"
+                            >
+                              <div className="font-black">{answerReveal.text}</div>
+                              <div className="text-xs">Type the answer shown to continue</div>
+                            </motion.div>
+                          )}
+                          {!answerReveal && showSlowDown && (
+                            <motion.div
+                              key="slow-down"
+                              initial={{ opacity: 0, scale: 0.96 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.96 }}
+                              className="timed-slow-down"
+                            >
+                              Slow down! Read carefully
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
                       {/* Keypad */}
                       <div className="timed-keypad-wrap">
                         <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
-                          {["1","2","3","DEL","4","5","6","CLR","7","8","9","-","","0","",""].map((k, i) => {
+                          {["1","2","3","DEL","4","5","6","CLR","7","8","9","","","0","",""].map((k, i) => {
                             if (k === "DEL") return <button key={i} onClick={() => handleNumClick("DEL")} className="p-3 rounded-xl bg-red-100 border-2 border-red-200 text-red-700 font-black text-sm cursor-pointer active:bg-red-200 transition">⌫</button>;
                             if (k === "CLR") return <button key={i} onClick={() => handleNumClick("CLR")} className="p-3 rounded-xl bg-slate-100 border-2 border-slate-200 text-slate-700 font-black text-sm cursor-pointer active:bg-slate-200 transition">C</button>;
-                            if (k === "-") {
-                              return <button key={i} onClick={() => handleNumClick(k)} className={`p-3 rounded-xl font-black text-lg cursor-pointer transition border-2 ${
-                                userAnswer === "-" ? "bg-blue-200 border-blue-400 text-blue-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                              }`}>-</button>;
-                            }
                             if (k === "") return <div key={i} />;
                             return <button key={i} onClick={() => handleNumClick(k)} className="p-3 rounded-xl bg-white border-2 border-slate-200 text-blue-900 font-black text-lg cursor-pointer hover:bg-blue-50 active:bg-blue-100 transition shadow-sm">{k}</button>;
                           })}
