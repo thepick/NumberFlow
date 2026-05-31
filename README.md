@@ -157,6 +157,24 @@ Current lesson facts are the main practice pool. Older facts return as Quick Rev
 
 This keeps students moving forward while still protecting earlier learning.
 
+
+## Adaptive review engine
+
+Mental Math Journey includes an adaptive review engine that tracks each practiced fact over time, not just the final score from a round. For every fact, the app stores how often it has appeared, how often it was answered correctly or incorrectly, whether it timed out, the average response time, a short history of recent attempts, a confidence score, a mastery score, fast-streak progress, slow-or-wrong history, and a current status.
+
+The speed target is used to decide what counts as fluent. Internally, the app converts the target facts-per-minute setting into a fluent response time. Fast correct answers raise confidence more strongly, slower correct answers raise it less, and wrong answers or timeouts lower confidence. Recent mistakes, timeouts, and very slow responses can also prevent a fact from being treated as fully fluent too quickly.
+
+Each fact is classified into one of several review states:
+
+```text
+empty -> learning -> near-ready -> review -> fluent
+                         \-> needs-support
+```
+
+When the app chooses facts for practice, it uses weighted selection rather than simple random selection. Facts are more likely to return when they have low mastery, low accuracy, recent weak attempts, timeouts, slow response history, or a status such as `learning` or `needs-support`. Facts that are fluent are shown less often, but they are not permanently removed. This keeps strong facts fresh while giving weaker facts more practice.
+
+Older facts can return through Quick Review. The review engine looks across previously practiced facts, prioritizes facts that need attention, and mixes them into current lesson practice in a controlled way. This helps students keep moving forward through the journey while still revisiting facts that are not yet fast and accurate.
+
 ## Progress storage
 
 Progress is stored locally in the browser using `localStorage`.
